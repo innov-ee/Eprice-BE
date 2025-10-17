@@ -1,16 +1,20 @@
 package ee.innov.eprice
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -22,11 +26,14 @@ import java.time.temporal.ChronoUnit
 // --- Data Models for Parsing ENTSO-E XML Response ---
 data class PublicationMarketDocument(
     @JsonProperty("TimeSeries")
+    @JacksonXmlElementWrapper(useWrapping = false)
     val timeSeries: List<TimeSeries> = emptyList()
 )
 
 data class TimeSeries(
+    val mRID: String? = null, // Added for robustness
     @JsonProperty("Period")
+    @JacksonXmlElementWrapper(useWrapping = false)
     val period: List<Period> = emptyList()
 )
 
@@ -34,14 +41,15 @@ data class Period(
     val timeInterval: TimeInterval,
     val resolution: String,
     @JsonProperty("Point")
+    @JacksonXmlElementWrapper(useWrapping = false)
     val point: List<Point> = emptyList()
 )
 
 data class TimeInterval(val start: String)
 data class Point(
     val position: Int,
-    @JsonProperty("price.amount") // This annotation maps the XML tag to the property
-    val priceAmount: Double // The property name is now a valid Kotlin identifier
+    @JsonProperty("price.amount")
+    val priceAmount: Double
 )
 
 // --- Data Model for the final JSON API Response ---
@@ -62,17 +70,18 @@ fun main() {
 
     // Set up the Ktor server
     embeddedServer(Netty, port = port, host = host) {
-        // Install CORS to allow requests from your app's domain
+        install(ContentNegotiation) {
+            json()
+        }
         install(CORS) {
-            anyHost() // For simplicity, allows any host. Can be configured to be more restrictive.
+            anyHost()
             allowHeader(HttpHeaders.ContentType)
         }
 
-        // Configure routing
         routing {
             get("/api/prices") {
                 if (apiKey.isNullOrBlank()) {
-                    call.application.log.error("ENTSOE_API_KEY is not set in environment variables.")
+                    call.application.log.error("ENTSOE_API_KEY is not set.")
                     call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Server configuration error."))
                     return@get
                 }
@@ -99,15 +108,16 @@ fun main() {
 
                     // 3. Parse XML response
                     val xmlMapper = XmlMapper().registerKotlinModule()
+                    xmlMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                     val marketDocument = xmlMapper.readValue(xmlString, PublicationMarketDocument::class.java)
 
                     // 4. Transform data into the final format
                     val prices = marketDocument.timeSeries.firstOrNull()?.period?.firstOrNull()?.let { period ->
-                        val resolutionMinutes = period.resolution.removePrefix("PT").removeSuffix("M").toLong()
-                        val periodStartInstant = Instant.parse(period.timeInterval.start)
+                        val resolutionMinutes = period.resolution.removePrefix("PT").removeSuffix("M").toLongOrNull() ?: 60L
+                        val periodStartInstant = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.start))
 
                         period.point.map { point ->
-                            val pricePerKWh = point.priceAmount / 1000.0 // Use the corrected property name
+                            val pricePerKWh = point.priceAmount / 1000.0
                             val intervalStart = periodStartInstant.plus((point.position - 1) * resolutionMinutes, ChronoUnit.MINUTES)
 
                             PriceData(
