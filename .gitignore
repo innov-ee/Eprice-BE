@@ -1,0 +1,22 @@
+# Gradle
+.gradle
+build/
+!build/libs/
+!build-distributions/
+!build/reports/
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+
+# Environment
+.env
+local.properties
+
+# Logs
+*.log
+
+# OS-specific
+.DS_Store
+Thumbs.db
