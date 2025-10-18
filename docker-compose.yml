@@ -1,0 +1,15 @@
+# docker-compose.yml for local development.
+services:
+  eprice-be:
+    # Build the image from the Dockerfile in the current directory.
+    build: .
+    container_name: eprice-be
+    # Map host ports to container ports (app port, debug port).
+    ports:
+      - "8080:8080"
+      - "5005:5005"
+    env_file:
+      - .env
+    # Override the Dockerfile's entrypoint to enable the JVM debugger.
+    # basically does `EXPOSE 5005` in the dockerfile, but we dont want that there as that goes to prod.
+    entrypoint: [ "java", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005", "-jar", "app.jar" ]
