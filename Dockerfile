@@ -2,18 +2,12 @@
 FROM gradle:8.8.0-jdk17 AS build
 WORKDIR /home/gradle/src
 
-# Copy build files
-COPY build.gradle.kts settings.gradle.kts gradlew ./
-COPY gradle ./gradle
-
-# Download and cache dependencies
-RUN ./gradlew dependencies --info
-
-# Copy source code
+# Copy the *entire* project in first
 COPY . .
 
-# Build the application, excludes tests.
-RUN ./gradlew build -x test
+# Run the 'buildFatJar' task explicitly to create the '-all.jar'
+# This is the task the Ktor plugin provides.
+RUN ./gradlew buildFatJar -x test
 
 # Stage 2: Create the final production image
 FROM eclipse-temurin:17-jre
