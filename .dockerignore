@@ -1,0 +1,14 @@
+# Ignore Gradle cache and build outputs
+.gradle
+build/
+
+# Ignore IDE-specific files
+.idea/
+*.iml
+
+# Ignore local environment files
+.env
+local.properties
+
+# Ignore OS-specific files
+.DS_Store

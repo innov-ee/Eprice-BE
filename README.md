@@ -1,12 +1,11 @@
 # Eprice Backend
 
-## Running
-- declare `ENTSOE_API_KEY` in your env
+## Config
+- declare `ENTSOE_API_KEY` in /.env
 
-### Notes to self
-- in AS create Application run config
-- module is .main
-- main class is Application.kt
+### Running locally
+- start (with changes): docker-compose up --build
+- stop: Ctrl + C
 
 ### Verify
 - open http://localhost:8080/api/prices
