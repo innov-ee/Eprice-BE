@@ -1,34 +1,67 @@
-name: Deploy to Production VPS
+name: Build and Deploy to Production VPS
 
 on:
-  # 1. Trigger on a push to the main branch
   push:
     branches:
       - main
-
-  # 2. Allow manual triggering from the GitHub Actions tab
   workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy Application
+  build-and-deploy:
+    name: Build, Push, and Deploy
     runs-on: ubuntu-latest
 
+    # Grant GITHUB_TOKEN permissions to write to GHCR (packages)
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - name: SSH into VPS and Deploy
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          # GITHUB_TOKEN is automatically created by Actions
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Define Image Name
+        # Sets an env var IMAGE_NAME=ghcr.io/your-user/eprice-be
+        run: echo "IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}" >> $GITHUB_ENV
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_SSH_HOST }}
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-
           script: |
             APP_DIR="/home/deployer/Eprice-BE"
+            IMAGE_TO_DEPLOY="${{ env.IMAGE_NAME }}:${{ github.sha }}"
+            GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            GH_USER="${{ github.repository_owner }}"
             
             # 1. Securely create the .env file on the server
             cat <<EOF > $APP_DIR/.env
             ENTSOE_API_KEY=${{ secrets.ENTSOE_API_KEY }}
             EOF
             
-            # 2. Run the deploy script
-            bash /home/deployer/deploy.sh
+            # 2. Log in to GHCR on the VPS
+            echo "$GH_TOKEN" | docker login ghcr.io -u $GH_USER --password-stdin
+            
+            # 3. Run the deploy script, passing the new image and token
+            bash /home/deployer/deploy.sh "$IMAGE_TO_DEPLOY" "$GH_TOKEN"
