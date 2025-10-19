@@ -113,7 +113,13 @@ fun main() {
 
                     if (!response.status.isSuccess() || xmlString.contains("<Reason>")) {
                         call.application.log.error("ENTSO-E API Error Response: $xmlString")
-                        call.respond(HttpStatusCode.BadGateway, mapOf("error" to "Failed to fetch data from ENTSO-E."))
+                        call.respond(
+                            HttpStatusCode.BadGateway,
+                            mapOf(
+                                "error" to "Failed to fetch data from ENTSO-E.",
+                                "details" to xmlString
+                            )
+                        )
                         return@get
                     }
 
@@ -141,10 +147,22 @@ fun main() {
 
                 } catch (e: HttpRequestTimeoutException) {
                     call.application.log.error("ENTSO-E API timed out: ${e.message}", e)
-                    call.respond(HttpStatusCode.GatewayTimeout, mapOf("error" to "Request to energy provider timed out."))
+                    call.respond(
+                        HttpStatusCode.GatewayTimeout,
+                        mapOf(
+                            "error" to "Request to energy provider timed out.",
+                            "details" to e.message
+                        )
+                    )
                 } catch (e: Exception) {
                     call.application.log.error("An error occurred: ${e.message}", e)
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal server error occurred."))
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf(
+                            "error" to "An internal server error occurred.",
+                            "details" to e.message
+                        )
+                    )
                 }
             }
         }
