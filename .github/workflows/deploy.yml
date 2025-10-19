@@ -1,0 +1,34 @@
+name: Deploy to Production VPS
+
+on:
+  # 1. Trigger on a push to the main branch
+  push:
+    branches:
+      - main
+
+  # 2. Allow manual triggering from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH into VPS and Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+
+          script: |
+            APP_DIR="/home/deployer/Eprice-BE"
+            
+            # 1. Securely create the .env file on the server
+            cat <<EOF > $APP_DIR/.env
+            ENTSOE_API_KEY=${{ secrets.ENTSOE_API_KEY }}
+            EOF
+            
+            # 2. Run the deploy script
+            bash /home/deployer/deploy.sh
