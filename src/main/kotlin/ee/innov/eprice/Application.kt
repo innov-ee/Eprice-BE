@@ -7,6 +7,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -23,7 +24,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
-// --- Data Models for Parsing ENTSO-E XML Response ---
+// --- Data Models ---
 data class PublicationMarketDocument(
     @JsonProperty("TimeSeries")
     @JacksonXmlElementWrapper(useWrapping = false)
@@ -31,7 +32,7 @@ data class PublicationMarketDocument(
 )
 
 data class TimeSeries(
-    val mRID: String? = null, // Added for robustness
+    val mRID: String? = null,
     @JsonProperty("Period")
     @JacksonXmlElementWrapper(useWrapping = false)
     val period: List<Period> = emptyList()
@@ -52,12 +53,23 @@ data class Point(
     val priceAmount: Double
 )
 
-// --- Data Model for the final JSON API Response ---
 @kotlinx.serialization.Serializable
 data class PriceData(
     val startTimeUTC: String,
     val price_eur_kwh: String
 )
+
+private val client = HttpClient(CIO) {
+    install(HttpTimeout) {
+        requestTimeoutMillis = 15000 // Total request time: 15 seconds
+        connectTimeoutMillis = 10000 // Connection establishment: 10 seconds
+        socketTimeoutMillis = 10000  // Inactivity between data packets: 10 seconds
+    }
+}
+
+private val xmlMapper = XmlMapper().registerKotlinModule().apply {
+    configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+}
 
 fun main() {
     // Read environment variables
@@ -94,11 +106,10 @@ fun main() {
                     val periodEnd = formatter.format(now.truncatedTo(ChronoUnit.DAYS).plus(1, ChronoUnit.DAYS).minus(1, ChronoUnit.MINUTES))
 
                     // 2. Build URL and make request to ENTSO-E
-                    val client = HttpClient(CIO)
                     val entsoeApiUrl = "https://web-api.tp.entsoe.eu/api?securityToken=$apiKey&documentType=A44&in_Domain=$eestiBiddingZone&out_Domain=$eestiBiddingZone&periodStart=$periodStart&periodEnd=$periodEnd"
+
                     val response: HttpResponse = client.get(entsoeApiUrl)
                     val xmlString = response.bodyAsText()
-                    client.close()
 
                     if (!response.status.isSuccess() || xmlString.contains("<Reason>")) {
                         call.application.log.error("ENTSO-E API Error Response: $xmlString")
@@ -107,8 +118,6 @@ fun main() {
                     }
 
                     // 3. Parse XML response
-                    val xmlMapper = XmlMapper().registerKotlinModule()
-                    xmlMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                     val marketDocument = xmlMapper.readValue(xmlString, PublicationMarketDocument::class.java)
 
                     // 4. Transform data into the final format
@@ -130,6 +139,9 @@ fun main() {
                     // 5. Send the response
                     call.respond(prices)
 
+                } catch (e: HttpRequestTimeoutException) {
+                    call.application.log.error("ENTSO-E API timed out: ${e.message}", e)
+                    call.respond(HttpStatusCode.GatewayTimeout, mapOf("error" to "Request to energy provider timed out."))
                 } catch (e: Exception) {
                     call.application.log.error("An error occurred: ${e.message}", e)
                     call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal server error occurred."))
@@ -138,4 +150,3 @@ fun main() {
         }
     }.start(wait = true)
 }
-
