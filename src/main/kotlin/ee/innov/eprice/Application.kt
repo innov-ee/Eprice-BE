@@ -99,10 +99,12 @@ fun main() {
                 }
 
                 try {
-                    // 1. Calculate time period for today AND tomorrow in UTC
+                    // 1. Calculate time period for yesterday, today, AND tomorrow in UTC
                     val now = Instant.now()
                     val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm").withZone(ZoneOffset.UTC)
-                    val periodStart = formatter.format(now.truncatedTo(ChronoUnit.DAYS))
+
+                    // Set periodStart to the beginning of yesterday
+                    val periodStart = formatter.format(now.truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS))
 
                     val periodEnd = formatter.format(now.truncatedTo(ChronoUnit.DAYS).plus(2, ChronoUnit.DAYS).minus(1, ChronoUnit.MINUTES))
 
