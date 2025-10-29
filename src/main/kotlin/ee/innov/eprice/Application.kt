@@ -99,11 +99,12 @@ fun main() {
                 }
 
                 try {
-                    // 1. Calculate time period for today in UTC
+                    // 1. Calculate time period for today AND tomorrow in UTC
                     val now = Instant.now()
                     val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm").withZone(ZoneOffset.UTC)
                     val periodStart = formatter.format(now.truncatedTo(ChronoUnit.DAYS))
-                    val periodEnd = formatter.format(now.truncatedTo(ChronoUnit.DAYS).plus(1, ChronoUnit.DAYS).minus(1, ChronoUnit.MINUTES))
+
+                    val periodEnd = formatter.format(now.truncatedTo(ChronoUnit.DAYS).plus(2, ChronoUnit.DAYS).minus(1, ChronoUnit.MINUTES))
 
                     // 2. Build URL and make request to ENTSO-E
                     val entsoeApiUrl = "https://web-api.tp.entsoe.eu/api?securityToken=$apiKey&documentType=A44&in_Domain=$eestiBiddingZone&out_Domain=$eestiBiddingZone&periodStart=$periodStart&periodEnd=$periodEnd"
@@ -112,6 +113,13 @@ fun main() {
                     val xmlString = response.bodyAsText()
 
                     if (!response.status.isSuccess() || xmlString.contains("<Reason>")) {
+                        // Check if it's a "no data" error, which is fine if tomorrow's prices aren't published
+                        if (xmlString.contains("No matching data found", ignoreCase = true)) {
+                            call.application.log.warn("No matching data found for period $periodStart - $periodEnd. (This is normal if prices for tomorrow are not yet published)")
+                            call.respond(emptyList<PriceData>()) // Respond with empty list
+                            return@get
+                        }
+
                         call.application.log.error("ENTSO-E API Error Response: $xmlString")
                         call.respond(
                             HttpStatusCode.BadGateway,
@@ -127,20 +135,22 @@ fun main() {
                     val marketDocument = xmlMapper.readValue(xmlString, PublicationMarketDocument::class.java)
 
                     // 4. Transform data into the final format
-                    val prices = marketDocument.timeSeries.firstOrNull()?.period?.firstOrNull()?.let { period ->
-                        val resolutionMinutes = period.resolution.removePrefix("PT").removeSuffix("M").toLongOrNull() ?: 60L
-                        val periodStartInstant = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.start))
+                    val prices = marketDocument.timeSeries.flatMap { timeSeries ->
+                        timeSeries.period.flatMap { period ->
+                            val resolutionMinutes = period.resolution.removePrefix("PT").removeSuffix("M").toLongOrNull() ?: 60L
+                            val periodStartInstant = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.start))
 
-                        period.point.map { point ->
-                            val pricePerKWh = point.priceAmount / 1000.0
-                            val intervalStart = periodStartInstant.plus((point.position - 1) * resolutionMinutes, ChronoUnit.MINUTES)
+                            period.point.map { point ->
+                                val pricePerKWh = point.priceAmount / 1000.0
+                                val intervalStart = periodStartInstant.plus((point.position - 1) * resolutionMinutes, ChronoUnit.MINUTES)
 
-                            PriceData(
-                                startTimeUTC = intervalStart.toString(),
-                                price_eur_kwh = "%.5f".format(pricePerKWh)
-                            )
+                                PriceData(
+                                    startTimeUTC = intervalStart.toString(),
+                                    price_eur_kwh = "%.5f".format(pricePerKWh)
+                                )
+                            }
                         }
-                    } ?: emptyList()
+                    }
 
                     // 5. Send the response
                     call.respond(prices)
