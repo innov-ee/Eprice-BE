@@ -67,5 +67,5 @@ jobs:
             # 2. Log in to GHCR on the VPS
             echo "$GH_TOKEN" | docker login ghcr.io -u $GH_USER --password-stdin
             
-            # 3. Run the deploy script, passing the new image and token
-            bash /home/deployer/deploy.sh "$IMAGE_TO_DEPLOY" "$GH_TOKEN"
+            # 3. Run the deploy script
+            bash /home/deployer/deploy.sh "$IMAGE_TO_DEPLOY"
