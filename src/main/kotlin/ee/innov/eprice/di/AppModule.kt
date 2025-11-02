@@ -36,8 +36,10 @@ val appModule = module {
 
     // Environment-provided values
     single(qualifier = named("entsoeApiKey")) {
-        System.getenv("ENTSOE_API_KEY") ?: ""
+        System.getenv("ENTSOE_API_KEY")
+            ?: throw IllegalStateException("ENTSOE_API_KEY environment variable is not set.")
     }
+
     single(qualifier = named("eestiBiddingZone")) {
         "10Y1001A1001A39I"
     }

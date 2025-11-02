@@ -37,11 +37,16 @@ class EntsoeRemoteDataSource(
         val periodStart = formatter.format(start)
         val periodEnd = formatter.format(end)
 
-        val entsoeApiUrl = "https://web-api.tp.entsoe.eu/api?securityToken=$apiKey" +
-                "&documentType=A44&in_Domain=$biddingZone" +
-                "&out_Domain=$biddingZone&periodStart=$periodStart&periodEnd=$periodEnd"
-
-        val response: HttpResponse = client.get(entsoeApiUrl)
+        val response: HttpResponse = client.get("https://web-api.tp.entsoe.eu/api") {
+            url {
+                parameters.append("securityToken", apiKey)
+                parameters.append("documentType", "A44")
+                parameters.append("in_Domain", biddingZone)
+                parameters.append("out_Domain", biddingZone)
+                parameters.append("periodStart", periodStart)
+                parameters.append("periodEnd", periodEnd)
+            }
+        }
         val xmlString = response.bodyAsText()
 
         if (!response.status.isSuccess() || xmlString.contains("<Reason>")) {

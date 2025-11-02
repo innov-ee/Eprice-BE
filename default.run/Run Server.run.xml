@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+    <configuration name="Run Server" default="false" factoryName="Application" type="Application">
+        <option name="envFilePaths">
+            <option value="$PROJECT_DIR$/.env" />
+        </option>
+        <option name="MAIN_CLASS_NAME" value="ee.innov.eprice.ApplicationKt" />
+        <module name="Eprice-BE.main" />
+        <method v="2">
+            <option name="Make" enabled="true" />
+        </method>
+    </configuration>
+</component>
