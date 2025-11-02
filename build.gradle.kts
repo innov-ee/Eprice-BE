@@ -1,5 +1,6 @@
 val kotlin_version = "1.9.23"
 val ktor_version = "2.3.10"
+val koinVersion = "3.5.3"
 
 plugins {
     kotlin("jvm") version "1.9.23"
@@ -27,6 +28,10 @@ dependencies {
     // Ktor Client for making HTTP requests
     implementation("io.ktor:ktor-client-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-cio-jvm:$ktor_version")
+
+    // Koin
+    implementation("io.insert-koin:koin-ktor:${koinVersion}")
+    implementation("io.insert-koin:koin-logger-slf4j:${koinVersion}")
 
     // JSON Serialization for response
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktor_version")
