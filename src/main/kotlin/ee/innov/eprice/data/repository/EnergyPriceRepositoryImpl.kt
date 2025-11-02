@@ -1,7 +1,7 @@
 package ee.innov.eprice.data.repository
 
 import ee.innov.eprice.data.remote.EntsoeRemoteDataSource
-import ee.innov.eprice.data.remote.mapper.toDomainEnergyPrices
+import ee.innov.eprice.data.remote.dto.toDomainEnergyPrices
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.toApiError
@@ -20,7 +20,7 @@ class EnergyPriceRepositoryImpl(
             val marketDocument = remoteDataSource.fetchPrices(start, end)
             val prices = marketDocument.toDomainEnergyPrices()
             Result.success(prices)
-        } catch (e: NoDataFoundException) {
+        } catch (_: NoDataFoundException) {
             // "No data" is not a failure, it's just an empty list.
             Result.success(emptyList())
         } catch (e: Exception) {

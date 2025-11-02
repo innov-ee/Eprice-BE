@@ -25,7 +25,6 @@ class GetEnergyPricesUseCase(
             .plus(2, ChronoUnit.DAYS)
             .minus(1, ChronoUnit.MINUTES)
 
-        // Delegate fetching to the repository
         return energyPriceRepository.getPrices(start, end)
     }
 }

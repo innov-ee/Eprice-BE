@@ -15,25 +15,23 @@ import org.koin.core.context.startKoin
 import org.koin.logger.slf4jLogger
 
 fun main() {
-    // Read environment variables
     val port = System.getenv("PORT")?.toInt() ?: 8080
     val host = System.getenv("HOST") ?: "0.0.0.0"
 
-    // Start Koin
     startKoin {
-        slf4jLogger() // Use SLF4J for Koin logging
+        slf4jLogger()
         modules(appModule)
     }
 
-    // Set up and start the Ktor server
-    embeddedServer(Netty, port = port, host = host, module = Application::module)
-        .start(wait = true)
+    embeddedServer(
+        Netty,
+        port = port,
+        host = host,
+        module = Application::module
+    ).start(wait = true)
 }
 
-/**
- * Ktor application module.
- * This function configures Ktor plugins and routing.
- */
+
 fun Application.module() {
     install(ContentNegotiation) {
         json() // Use kotlinx.serialization for JSON
@@ -43,7 +41,6 @@ fun Application.module() {
         allowHeader(HttpHeaders.ContentType)
     }
 
-    // Configure routing
     routing {
         priceRoutes() // Use the modularized routes
     }

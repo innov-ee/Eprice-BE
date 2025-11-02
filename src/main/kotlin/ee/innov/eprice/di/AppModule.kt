@@ -14,9 +14,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 val appModule = module {
-    // --- Singletons ---
 
-    // Ktor HTTP Client
     single {
         HttpClient(CIO) {
             install(HttpTimeout) {
@@ -27,24 +25,19 @@ val appModule = module {
         }
     }
 
-    // Jackson XML Mapper
     single {
         XmlMapper().registerKotlinModule().apply {
             configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         }
     }
 
-    // Environment-provided values
     single(qualifier = named("entsoeApiKey")) {
         System.getenv("ENTSOE_API_KEY")
             ?: throw IllegalStateException("ENTSOE_API_KEY environment variable is not set.")
     }
 
-    single(qualifier = named("eestiBiddingZone")) {
-        "10Y1001A1001A39I"
-    }
+    single(qualifier = named("eestiBiddingZone")) { "10Y1001A1001A39I" }
 
-    // --- Data Layer ---
     single {
         EntsoeRemoteDataSource(
             client = get(),
@@ -54,19 +47,7 @@ val appModule = module {
         )
     }
 
-    // Bind the implementation to the interface
-    single<EnergyPriceRepository> {
-        EnergyPriceRepositoryImpl(
-            remoteDataSource = get()
-        )
-    }
+    single<EnergyPriceRepository> { EnergyPriceRepositoryImpl(remoteDataSource = get()) }
 
-    // --- Domain Layer ---
-
-    // Use 'factory' for use cases as they are typically lightweight and stateless
-    factory {
-        GetEnergyPricesUseCase(
-            energyPriceRepository = get()
-        )
-    }
+    factory { GetEnergyPricesUseCase(energyPriceRepository = get()) }
 }
