@@ -89,8 +89,10 @@ fun main() {
             anyHost()
             allowHeader(HttpHeaders.ContentType)
         }
-
         routing {
+            get("/api") {
+                call.respond("All good")
+            }
             get("/api/prices") {
                 if (apiKey.isNullOrBlank()) {
                     call.application.log.error("ENTSOE_API_KEY is not set.")
