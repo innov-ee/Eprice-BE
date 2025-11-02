@@ -26,7 +26,7 @@ sealed class ApiError(
     data class Timeout(
         override val details: String,
         override val cause: Throwable
-    ) : ApiError("Request timed out", details, cause)
+    ) : ApiError("Outgoing Request timed out", details, cause)
 
     data class Parsing(
         override val details: String,
