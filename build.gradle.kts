@@ -44,8 +44,27 @@ dependencies {
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.6")
 
-    // Testing
-    testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
+    // Ktor testing
+    testImplementation("io.ktor:ktor-server-test-host:${ktor_version}")
+    testImplementation("io.ktor:ktor-client-mock:${ktor_version}")
+
+    // Koin testing
+    testImplementation("io.insert-koin:koin-test-junit5:${koinVersion}") {
+        // Exclude the JUnit 4 runner it transitively depends on
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-test-junit")
+    }
+
+    testImplementation("io.mockk:mockk:1.13.8")
+
+    // JUnit 5 test runner
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:${kotlin_version}")
+
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+    }
 }
 
