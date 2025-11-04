@@ -26,8 +26,7 @@ val appModule = module {
     }
 
     single {
-        XmlMapper().apply {
-            registerKotlinModule()
+        XmlMapper().registerKotlinModule().apply {
             configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         }
     }
