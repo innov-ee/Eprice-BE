@@ -18,6 +18,10 @@ fun Route.priceRoutes() {
     // Inject the use case directly into the route
     val getEnergyPricesUseCase: GetEnergyPricesUseCase by inject()
 
+    get("/health") {
+        call.respond(HttpStatusCode.OK, mapOf("status" to "UP"))
+    }
+
     get("/api") {
         call.respond("All good")
     }
