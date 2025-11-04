@@ -46,6 +46,7 @@ dependencies {
 
     // Ktor testing
     testImplementation("io.ktor:ktor-server-test-host:${ktor_version}")
+    testImplementation("io.ktor:ktor-client-mock:${ktor_version}")
 
     // Koin testing
     testImplementation("io.insert-koin:koin-test-junit5:${koinVersion}") {
