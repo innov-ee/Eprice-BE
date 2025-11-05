@@ -13,7 +13,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-class EntsoeRemoteDataSource(
+class EntsoeService(
     private val client: HttpClient,
     private val xmlMapper: XmlMapper,
     private val apiKey: String,

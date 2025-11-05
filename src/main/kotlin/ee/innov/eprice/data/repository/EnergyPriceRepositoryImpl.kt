@@ -1,6 +1,6 @@
 package ee.innov.eprice.data.repository
 
-import ee.innov.eprice.data.remote.EntsoeRemoteDataSource
+import ee.innov.eprice.data.remote.EntsoeService
 import ee.innov.eprice.data.remote.dto.toDomainEnergyPrices
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
@@ -9,7 +9,7 @@ import ee.innov.eprice.domain.repository.EnergyPriceRepository
 import java.time.Instant
 
 class EnergyPriceRepositoryImpl(
-    private val remoteDataSource: EntsoeRemoteDataSource
+    private val entsoeService: EntsoeService
 ) : EnergyPriceRepository {
 
     override suspend fun getPrices(
@@ -17,7 +17,7 @@ class EnergyPriceRepositoryImpl(
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
         return try {
-            val marketDocument = remoteDataSource.fetchPrices(start, end)
+            val marketDocument = entsoeService.fetchPrices(start, end)
             val prices = marketDocument.toDomainEnergyPrices()
             Result.success(prices)
         } catch (_: NoDataFoundException) {

@@ -3,7 +3,7 @@ package ee.innov.eprice.di
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import ee.innov.eprice.data.remote.EntsoeRemoteDataSource
+import ee.innov.eprice.data.remote.EntsoeService
 import ee.innov.eprice.data.repository.EnergyPriceRepositoryImpl
 import ee.innov.eprice.domain.repository.EnergyPriceRepository
 import ee.innov.eprice.domain.usecase.GetEnergyPricesUseCase
@@ -37,18 +37,18 @@ val appModule = module {
             ?: throw IllegalStateException("ENTSOE_API_KEY environment variable is not set.")
     }
 
-    single(qualifier = named("eestiBiddingZone")) { "10Y1001A1001A39I" }
+    single(qualifier = named("biddingZone")) { "10Y1001A1001A39I" }
 
     single {
-        EntsoeRemoteDataSource(
+        EntsoeService(
             client = get(),
             xmlMapper = get(),
             apiKey = get(qualifier = named("entsoeApiKey")),
-            biddingZone = get(qualifier = named("eestiBiddingZone"))
+            biddingZone = get(qualifier = named("biddingZone"))
         )
     }
 
-    single<EnergyPriceRepository> { EnergyPriceRepositoryImpl(remoteDataSource = get()) }
+    single<EnergyPriceRepository> { EnergyPriceRepositoryImpl(entsoeService = get()) }
 
     factory { GetEnergyPricesUseCase(energyPriceRepository = get()) }
 }
