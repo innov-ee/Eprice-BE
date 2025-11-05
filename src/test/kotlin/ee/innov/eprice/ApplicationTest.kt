@@ -79,17 +79,30 @@ class ApplicationTest {
         </Publication_MarketDocument>
     """.trimIndent()
 
+    private val mockEntsoeNoDataErrorXml = """
+            <Reason>
+                <text>No matching data found for the specified time interval</text>
+            </Reason>
+        """.trimIndent()
+
+    private val mockEntsoeAuthErrorXml = """
+            <Reason>
+                <text>Invalid security token</text>
+            </Reason>
+        """.trimIndent()
+
+
+    // --- Tests ---
 
     @Test
     fun `GET prices should return 200 OK with Elering price data`() {
         runPriceApiTest(
-            engineHandler = { request ->
-                if (request.url.host.contains("elering")) {
-                    mockJsonResponse(mockEleringSuccessJson, HttpStatusCode.OK)
-                } else {
-                    mockXmlResponse("<Error>Entsoe should not be called</Error>", HttpStatusCode.InternalServerError)
-                }
-            },
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
             testBlock = {
                 val response = client.get("/api/prices")
 
@@ -108,13 +121,12 @@ class ApplicationTest {
     @Test
     fun `GET prices should return 200 OK with Entsoe price data on Elering failure`() {
         runPriceApiTest(
-            engineHandler = { request ->
-                if (request.url.host.contains("elering")) {
-                    mockJsonResponse(mockEleringNoDataJson, HttpStatusCode.OK)
-                } else {
-                    mockXmlResponse(mockEntsoeSuccessXml, HttpStatusCode.OK)
-                }
-            },
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringNoDataJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = mockEntsoeSuccessXml,
+                entsoeStatus = HttpStatusCode.OK
+            ),
             testBlock = {
                 val response = client.get("/api/prices")
 
@@ -132,20 +144,13 @@ class ApplicationTest {
 
     @Test
     fun `GET prices should return 200 OK with empty list on NoDataFoundException from Entsoe`() {
-        val mockErrorResponse = """
-            <Reason>
-                <text>No matching data found for the specified time interval</text>
-            </Reason>
-        """.trimIndent()
-
         runPriceApiTest(
-            engineHandler = { request ->
-                if (request.url.host.contains("elering")) {
-                    mockJsonResponse(mockEleringNoDataJson, HttpStatusCode.OK)
-                } else {
-                    mockXmlResponse(mockErrorResponse, HttpStatusCode.BadRequest)
-                }
-            },
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringNoDataJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = mockEntsoeNoDataErrorXml,
+                entsoeStatus = HttpStatusCode.BadRequest
+            ),
             testBlock = {
                 val response = client.get("/api/prices")
 
@@ -157,20 +162,13 @@ class ApplicationTest {
 
     @Test
     fun `GET prices should return 502 BadGateway on general API error from Entsoe`() {
-        val mockErrorResponse = """
-            <Reason>
-                <text>Invalid security token</text>
-            </Reason>
-        """.trimIndent()
-
         runPriceApiTest(
-            engineHandler = { request ->
-                if (request.url.host.contains("elering")) {
-                    mockJsonResponse(mockEleringNoDataJson, HttpStatusCode.OK)
-                } else {
-                    mockXmlResponse(mockErrorResponse, HttpStatusCode.Unauthorized)
-                }
-            },
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringNoDataJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = mockEntsoeAuthErrorXml,
+                entsoeStatus = HttpStatusCode.Unauthorized
+            ),
             testBlock = {
                 val response = client.get("/api/prices")
 
@@ -183,6 +181,21 @@ class ApplicationTest {
         )
     }
 
+
+    private fun createMockEngineHandler(
+        eleringContent: String,
+        eleringStatus: HttpStatusCode,
+        entsoeContent: String,
+        entsoeStatus: HttpStatusCode
+    ): suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData {
+        return { request ->
+            if (request.url.host.contains("elering")) {
+                mockJsonResponse(eleringContent, eleringStatus)
+            } else {
+                mockXmlResponse(entsoeContent, entsoeStatus)
+            }
+        }
+    }
 
     /**
      * A helper to create a standardized XML response for the MockEngine.
