@@ -1,5 +1,6 @@
 package ee.innov.eprice.presentation
 
+import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
@@ -21,6 +22,7 @@ fun Route.priceRoutes() {
     val getEnergyPricesUseCase: GetEnergyPricesUseCase by inject()
     val getRollingAveragePriceUseCase: GetRollingAveragePriceUseCase by inject()
     val priceCache: PriceCache by inject()
+    val dailyAveragePriceCache: DailyAveragePriceCache by inject()
 
     get("/health") {
         call.respond(HttpStatusCode.OK, mapOf("status" to "UP"))
@@ -33,9 +35,9 @@ fun Route.priceRoutes() {
     get("/api/cache/clear") { // get so i can invoke it with browser
         try {
             priceCache.clear()
-            // Note: This does not clear the new DailyAveragePriceCache.
-            call.application.log.info("Cache clear requested and initiated.")
-            call.respond(HttpStatusCode.OK, mapOf("status" to "Cache clear initiated"))
+            dailyAveragePriceCache.clear()
+            call.application.log.info("Cache clear requested and initiated for all caches.")
+            call.respond(HttpStatusCode.OK, mapOf("status" to "All caches clear initiated"))
         } catch (e: Exception) {
             call.application.log.error("Error during cache clear request", e)
             call.respond(

@@ -52,6 +52,11 @@ interface DailyAveragePriceCache {
         startDate: LocalDate,
         endDate: LocalDate
     ): Map<LocalDate, Double>
+
+    /**
+     * Clears all entries from the cache (memory and persistent storage).
+     */
+    fun clear()
 }
 
 /**
@@ -117,6 +122,28 @@ class FileBackedDailyAveragePriceCache(
         return countryCache
             .mapKeysNotNull { LocalDate.parse(it.key, dateFormatter) }
             .filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
+    }
+
+    override fun clear() {
+        cache.clear()
+        println("In-memory daily average cache cleared.")
+
+        scope.launch {
+            persistMutex.withLock {
+                try {
+                    val deleted = Files.deleteIfExists(cacheFile)
+                    if (deleted) {
+                        println("Cache file $cacheFile deleted.")
+                    } else {
+                        println("Cache file $cacheFile did not exist.")
+                    }
+                } catch (e: Exception) {
+                    // Log the error, but don't crash the application
+                    println("Failed to delete cache file $cacheFile. Error: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     // Helper to allow safe transformation of map keys

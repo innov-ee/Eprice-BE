@@ -108,17 +108,19 @@ class InMemoryPriceCache(
 
         // 2. Clear backing file (asynchronously, like save)
         scope.launch {
-            try {
-                val deleted = Files.deleteIfExists(cacheFile)
-                if (deleted) {
-                    println("Cache file $cacheFile deleted.")
-                } else {
-                    println("Cache file $cacheFile did not exist.")
+            persistMutex.withLock {
+                try {
+                    val deleted = Files.deleteIfExists(cacheFile)
+                    if (deleted) {
+                        println("Cache file $cacheFile deleted.")
+                    } else {
+                        println("Cache file $cacheFile did not exist.")
+                    }
+                } catch (e: Exception) {
+                    // Log the error, but don't crash the application
+                    println("Failed to delete cache file $cacheFile. Error: ${e.message}")
+                    e.printStackTrace()
                 }
-            } catch (e: Exception) {
-                // Log the error, but don't crash the application
-                println("Failed to delete cache file $cacheFile. Error: ${e.message}")
-                e.printStackTrace()
             }
         }
     }
