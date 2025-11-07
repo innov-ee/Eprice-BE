@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import ee.innov.eprice.data.EnergyPriceRepositoryImpl
+import ee.innov.eprice.data.InMemoryPriceCache
+import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.EnergyPriceRepository
@@ -71,10 +73,15 @@ val appModule = module {
         EleringService(client = get())
     }
 
+    single<PriceCache> {
+        InMemoryPriceCache()
+    }
+
     single<EnergyPriceRepository> {
         EnergyPriceRepositoryImpl(
             entsoeService = get(),
             eleringService = get(),
+            cache = get() // Inject the cache
         )
     }
 
