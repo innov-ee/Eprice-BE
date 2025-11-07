@@ -9,8 +9,13 @@ import java.time.Instant
 data class EleringPriceResponse(
     val success: Boolean,
     @SerialName("data")
-    val data: Map<String, List<EleringPriceData>> = emptyMap()
-)
+    private val _data: Map<String, List<EleringPriceData>> = emptyMap()
+) {
+    // map keys always to be uppercase
+    val data: Map<String, List<EleringPriceData>> by lazy {
+        _data.mapKeys { it.key.uppercase() }
+    }
+}
 
 @Serializable
 data class EleringPriceData(
@@ -23,11 +28,12 @@ data class EleringPriceData(
  * Maps the Elering API response to a list of domain models for a specific country.
  *
  * @param countryCode The 2-letter country code (e.g., "EE", "FI") to extract prices for.
+ * This code is expected to be UPPERCASE.
  */
 fun EleringPriceResponse.toDomainEnergyPrices(countryCode: String): List<DomainEnergyPrice> {
     if (!this.success) return emptyList()
 
-    val prices = this.data[countryCode] ?: return emptyList()
+    val prices = this.data[countryCode.uppercase()] ?: return emptyList()
 
     return prices.map {
         DomainEnergyPrice(

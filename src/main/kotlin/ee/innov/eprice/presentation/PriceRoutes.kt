@@ -1,5 +1,6 @@
 package ee.innov.eprice.presentation
 
+import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.model.ApiError
 import io.ktor.http.HttpStatusCode
@@ -16,6 +17,7 @@ data class ErrorResponse(val error: String, val details: String? = null)
 fun Route.priceRoutes() {
     // Inject the use case directly into the route
     val getEnergyPricesUseCase: GetEnergyPricesUseCase by inject()
+    val priceCache: PriceCache by inject()
 
     get("/health") {
         call.respond(HttpStatusCode.OK, mapOf("status" to "UP"))
@@ -23,6 +25,20 @@ fun Route.priceRoutes() {
 
     get("/api") {
         call.respond("All good")
+    }
+
+    get("/api/cache/clear") { // get so i can invoke it with browser
+        try {
+            priceCache.clear()
+            call.application.log.info("Cache clear requested and initiated.")
+            call.respond(HttpStatusCode.OK, mapOf("status" to "Cache clear initiated"))
+        } catch (e: Exception) {
+            call.application.log.error("Error during cache clear request", e)
+            call.respond(
+                HttpStatusCode.InternalServerError,
+                ErrorResponse("Failed to initiate cache clear", e.message)
+            )
+        }
     }
 
     get("/api/prices/{countryCode?}") {

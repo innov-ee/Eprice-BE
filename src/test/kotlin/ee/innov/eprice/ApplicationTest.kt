@@ -1,6 +1,9 @@
+// file: kotlin/ee/innov/eprice/ApplicationTest.kt
 package ee.innov.eprice
 
+import ee.innov.eprice.data.PriceCache // Import PriceCache
 import ee.innov.eprice.di.appModule
+import ee.innov.eprice.domain.model.DomainEnergyPrice // Import DomainEnergyPrice
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -25,6 +28,19 @@ import org.koin.dsl.module
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * A "no-op" cache implementation for testing.
+ * It never returns a cached item (get always returns null)
+ * and does nothing on put.
+ */
+private class NoOpPriceCache : PriceCache {
+    override fun get(key: String): List<DomainEnergyPrice>? = null
+    override fun put(key: String, prices: List<DomainEnergyPrice>) { /* Do nothing */
+    }
+
+    override fun clear() { /* Do nothing */
+    }
+}
 
 class ApplicationTest {
 
@@ -242,6 +258,7 @@ class ApplicationTest {
         val testModule = module {
             single { mockHttpClient } // Override the real HttpClient
             single(qualifier = named("entsoeApiKey")) { "TEST_KEY" }
+            single<PriceCache> { NoOpPriceCache() }
         }
 
         application {

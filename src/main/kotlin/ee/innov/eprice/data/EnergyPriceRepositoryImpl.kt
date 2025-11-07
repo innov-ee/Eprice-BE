@@ -14,7 +14,8 @@ import java.time.Instant
 
 class EnergyPriceRepositoryImpl(
     private val entsoeService: EntsoeService,
-    private val eleringService: EleringService
+    private val eleringService: EleringService,
+    private val cache: PriceCache
 ) : EnergyPriceRepository {
 
     override suspend fun getPrices(
@@ -23,9 +24,34 @@ class EnergyPriceRepositoryImpl(
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
 
+        val cacheKey = "${countryCode}_${start}_$end"
+
+        val cachedPrices = cache.get(cacheKey)
+        if (cachedPrices != null) {
+            return Result.success(cachedPrices)
+        }
+
+        val networkResult = fetchFromNetwork(countryCode, start, end)
+
+        networkResult.onSuccess { prices ->
+            if (prices.isNotEmpty()) {
+                cache.put(cacheKey, prices)
+            }
+        }
+
+        return networkResult
+    }
+
+    /**
+     * Contains the original network-fetching logic.
+     */
+    private suspend fun fetchFromNetwork(
+        countryCode: String,
+        start: Instant,
+        end: Instant
+    ): Result<List<DomainEnergyPrice>> {
         // Strategy: Try Elering first.
         try {
-            println("Hitting Elering: $countryCode")
             val eleringMarketDocument = eleringService.fetchPrices(countryCode, start, end)
             val prices = eleringMarketDocument.toDomainEnergyPrices(countryCode)
             if (prices.isNotEmpty()) {
@@ -47,7 +73,6 @@ class EnergyPriceRepositoryImpl(
             )
 
         return try {
-            println("Hitting Entsoe: $countryCode")
             val marketDocument = entsoeService.fetchPrices(biddingZone, start, end)
             val prices = marketDocument.toDomainEnergyPrices()
             Result.success(prices)
