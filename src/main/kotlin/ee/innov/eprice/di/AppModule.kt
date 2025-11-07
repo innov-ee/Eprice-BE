@@ -44,24 +44,16 @@ val appModule = module {
             ?: throw IllegalStateException("ENTSOE_API_KEY environment variable is not set.")
     }
 
-    single(qualifier = named("entsoeBiddingZone")) { "10Y1001A1001A39I" }
-
     single {
         EntsoeService(
             client = get(),
             xmlMapper = get(),
-            apiKey = get(qualifier = named("entsoeApiKey")),
-            biddingZone = get(qualifier = named("entsoeBiddingZone"))
+            apiKey = get(qualifier = named("entsoeApiKey"))
         )
     }
 
-    single(qualifier = named("eleringCountryCode")) { "EE" }
-
     single {
-        EleringService(
-            client = get(),
-            countryCode = get(qualifier = named("eleringCountryCode"))
-        )
+        EleringService(client = get())
     }
 
     single<EnergyPriceRepository> {

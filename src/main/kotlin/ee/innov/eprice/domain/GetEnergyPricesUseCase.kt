@@ -8,10 +8,13 @@ class GetEnergyPricesUseCase(
     private val energyPriceRepository: EnergyPriceRepository
 ) {
     /**
-     * Executes the use case to get energy prices for yesterday, today, and tomorrow.
-     * Returns a Result containing the list of prices or an error.
+     * Executes the use case to get energy prices for yesterday, today, and tomorrow
+     * for a specific country.
+     *
+     * @param countryCode The 2-letter country code (e.g., "EE", "FI").
+     * @return A Result containing the list of prices or an error.
      */
-    suspend fun execute(): Result<List<DomainEnergyPrice>> {
+    suspend fun execute(countryCode: String): Result<List<DomainEnergyPrice>> {
         val now = Instant.now()
 
         // Business logic: Set periodStart to the beginning of yesterday
@@ -24,6 +27,6 @@ class GetEnergyPricesUseCase(
             .plus(2, ChronoUnit.DAYS)
             .minus(1, ChronoUnit.MINUTES)
 
-        return energyPriceRepository.getPrices(start, end)
+        return energyPriceRepository.getPrices(countryCode, start, end)
     }
 }

@@ -25,8 +25,10 @@ fun Route.priceRoutes() {
         call.respond("All good")
     }
 
-    get("/api/prices") {
-        val result = getEnergyPricesUseCase.execute()
+    get("/api/prices/{countryCode?}") {
+        val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
+
+        val result = getEnergyPricesUseCase.execute(countryCode)
 
         result.onSuccess { domainPrices ->
             // Map domain models to presentation DTOs
@@ -34,7 +36,7 @@ fun Route.priceRoutes() {
             call.respond(HttpStatusCode.OK, responseData)
 
         }.onFailure { error ->
-            call.application.log.error("Error fetching prices", error)
+            call.application.log.error("Error fetching prices for $countryCode", error)
 
             when (error) {
                 is ApiError.Timeout -> call.respond(

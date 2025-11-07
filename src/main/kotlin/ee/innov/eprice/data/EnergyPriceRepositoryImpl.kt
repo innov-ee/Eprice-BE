@@ -3,8 +3,10 @@ package ee.innov.eprice.data
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.elering.toDomainEnergyPrices
 import ee.innov.eprice.data.entsoe.EntsoeService
+import ee.innov.eprice.data.entsoe.toBiddingZone
 import ee.innov.eprice.data.entsoe.toDomainEnergyPrices
 import ee.innov.eprice.domain.EnergyPriceRepository
+import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.toApiError
@@ -16,13 +18,15 @@ class EnergyPriceRepositoryImpl(
 ) : EnergyPriceRepository {
 
     override suspend fun getPrices(
+        countryCode: String,
         start: Instant,
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
 
         // Strategy: Try Elering first.
         try {
-            val eleringMarketDocument = eleringService.fetchPrices(start, end)
+            println("Hitting Elering: $countryCode")
+            val eleringMarketDocument = eleringService.fetchPrices(countryCode, start, end)
             val prices = eleringMarketDocument.toDomainEnergyPrices()
             if (prices.isNotEmpty()) {
                 return Result.success(prices)
@@ -33,9 +37,18 @@ class EnergyPriceRepositoryImpl(
             println(e)
         }
 
-        // elering failed, try entso-e
+        // Elering failed, try entso-e
+        val biddingZone = countryCode.toBiddingZone()
+            ?: return Result.failure( // Return a specific error if mapping fails
+                ApiError.Unknown(
+                    "Unsupported country code for ENTSO-E fallback: $countryCode",
+                    IllegalArgumentException("No bidding zone mapping for $countryCode")
+                )
+            )
+
         return try {
-            val marketDocument = entsoeService.fetchPrices(start, end)
+            println("Hitting Entsoe: $countryCode")
+            val marketDocument = entsoeService.fetchPrices(biddingZone, start, end)
             val prices = marketDocument.toDomainEnergyPrices()
             Result.success(prices)
         } catch (_: NoDataFoundException) {
