@@ -20,12 +20,14 @@ data class EleringPriceData(
 )
 
 /**
- * Maps the Elering API response to a list of domain models.
+ * Maps the Elering API response to a list of domain models for a specific country.
+ *
+ * @param countryCode The 2-letter country code (e.g., "EE", "FI") to extract prices for.
  */
-fun EleringPriceResponse.toDomainEnergyPrices(): List<DomainEnergyPrice> {
+fun EleringPriceResponse.toDomainEnergyPrices(countryCode: String): List<DomainEnergyPrice> {
     if (!this.success) return emptyList()
 
-    val prices = this.data.values.firstOrNull() ?: return emptyList()
+    val prices = this.data[countryCode] ?: return emptyList()
 
     return prices.map {
         DomainEnergyPrice(

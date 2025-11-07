@@ -27,7 +27,7 @@ class EnergyPriceRepositoryImpl(
         try {
             println("Hitting Elering: $countryCode")
             val eleringMarketDocument = eleringService.fetchPrices(countryCode, start, end)
-            val prices = eleringMarketDocument.toDomainEnergyPrices()
+            val prices = eleringMarketDocument.toDomainEnergyPrices(countryCode)
             if (prices.isNotEmpty()) {
                 return Result.success(prices)
             }

@@ -19,9 +19,9 @@ class EleringService(
 
     /**
      * Fetches prices from Elering.
-     * @param countryCode The 2-letter country code (e.g., "EE", "FI").
+     * @param countryCode The 2-letter country code (e.g., "EE", "FI") to extract from the response.
      * @throws EleringApiException if the API returns an error.
-     * @throws NoDataFoundException if the API returns no data.
+     * @throws NoDataFoundException if the API returns no data for the specified country.
      * @throws io.ktor.client.plugins.HttpRequestTimeoutException on timeout.
      * @throws kotlinx.serialization.SerializationException on parsing error.
      */
@@ -37,7 +37,6 @@ class EleringService(
             url {
                 parameters.append("start", periodStart)
                 parameters.append("end", periodEnd)
-                parameters.append("country_code", countryCode)
             }
         }
 
@@ -50,7 +49,7 @@ class EleringService(
 
         val priceResponse = response.body<EleringPriceResponse>()
 
-        if (!priceResponse.success || priceResponse.data.isEmpty()) {
+        if (!priceResponse.success || !priceResponse.data.containsKey(countryCode)) {
             throw NoDataFoundException(
                 "Elering reported no data for $countryCode in period $periodStart - $periodEnd"
             )
