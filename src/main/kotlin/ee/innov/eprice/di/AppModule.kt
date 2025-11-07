@@ -12,13 +12,19 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import org.slf4j.LoggerFactory
 
 val appModule = module {
 
     single {
+        val clientLogger = LoggerFactory.getLogger("ee.innov.eprice.httpclient")
+
         HttpClient(CIO) {
             install(HttpTimeout) {
                 requestTimeoutMillis = 15000
@@ -28,6 +34,15 @@ val appModule = module {
             // Add JSON support for Ktor client (for Elering)
             install(ContentNegotiation) {
                 json()
+            }
+
+            install(Logging) {
+                logger = object : Logger {
+                    override fun log(message: String) {
+                        clientLogger.info(message)
+                    }
+                }
+                level = LogLevel.INFO
             }
         }
     }
