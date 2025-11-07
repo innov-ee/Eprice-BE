@@ -25,7 +25,6 @@ class EnergyPriceRepositoryImpl(
 
         // Strategy: Try Elering first.
         try {
-            println("Hitting Elering: $countryCode")
             val eleringMarketDocument = eleringService.fetchPrices(countryCode, start, end)
             val prices = eleringMarketDocument.toDomainEnergyPrices(countryCode)
             if (prices.isNotEmpty()) {
@@ -47,7 +46,6 @@ class EnergyPriceRepositoryImpl(
             )
 
         return try {
-            println("Hitting Entsoe: $countryCode")
             val marketDocument = entsoeService.fetchPrices(biddingZone, start, end)
             val prices = marketDocument.toDomainEnergyPrices()
             Result.success(prices)
