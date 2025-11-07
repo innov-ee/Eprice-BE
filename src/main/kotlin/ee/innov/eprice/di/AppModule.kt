@@ -3,13 +3,16 @@ package ee.innov.eprice.di
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import ee.innov.eprice.data.remote.EntsoeRemoteDataSource
+import ee.innov.eprice.data.remote.EleringService
+import ee.innov.eprice.data.remote.EntsoeService
 import ee.innov.eprice.data.repository.EnergyPriceRepositoryImpl
 import ee.innov.eprice.domain.repository.EnergyPriceRepository
 import ee.innov.eprice.domain.usecase.GetEnergyPricesUseCase
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
@@ -21,6 +24,10 @@ val appModule = module {
                 requestTimeoutMillis = 15000
                 connectTimeoutMillis = 10000
                 socketTimeoutMillis = 10000
+            }
+            // Add JSON support for Ktor client (for Elering)
+            install(ContentNegotiation) {
+                json()
             }
         }
     }
@@ -37,18 +44,32 @@ val appModule = module {
             ?: throw IllegalStateException("ENTSOE_API_KEY environment variable is not set.")
     }
 
-    single(qualifier = named("eestiBiddingZone")) { "10Y1001A1001A39I" }
+    single(qualifier = named("entsoeBiddingZone")) { "10Y1001A1001A39I" }
 
     single {
-        EntsoeRemoteDataSource(
+        EntsoeService(
             client = get(),
             xmlMapper = get(),
             apiKey = get(qualifier = named("entsoeApiKey")),
-            biddingZone = get(qualifier = named("eestiBiddingZone"))
+            biddingZone = get(qualifier = named("entsoeBiddingZone"))
         )
     }
 
-    single<EnergyPriceRepository> { EnergyPriceRepositoryImpl(remoteDataSource = get()) }
+    single(qualifier = named("eleringCountryCode")) { "EE" }
+
+    single {
+        EleringService(
+            client = get(),
+            countryCode = get(qualifier = named("eleringCountryCode"))
+        )
+    }
+
+    single<EnergyPriceRepository> {
+        EnergyPriceRepositoryImpl(
+            entsoeService = get(),
+            eleringService = get(),
+        )
+    }
 
     factory { GetEnergyPricesUseCase(energyPriceRepository = get()) }
 }

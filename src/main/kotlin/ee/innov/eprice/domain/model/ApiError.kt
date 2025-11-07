@@ -1,6 +1,7 @@
 package ee.innov.eprice.domain.model
 
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.serialization.SerializationException
 
 /**
  * A sealed class hierarchy for domain-specific errors,
@@ -43,6 +44,9 @@ sealed class ApiError(
 class EntsoeApiException(val code: Int, val details: String) :
     Exception("ENTSO-E API Error: $details")
 
+class EleringApiException(val code: Int, val details: String) :
+    Exception("Elering API Error: $details")
+
 class NoDataFoundException(details: String) : Exception(details)
 
 // Helper function to map generic Throwables to our specific ApiError
@@ -55,7 +59,9 @@ fun Throwable.toApiError(): ApiError {
     return when (this) {
         is HttpRequestTimeoutException -> ApiError.Timeout(details, this)
         is EntsoeApiException -> ApiError.Server(this.code, this.details, this)
+        is EleringApiException -> ApiError.Server(this.code, this.details, this)
         is com.fasterxml.jackson.core.JsonProcessingException -> ApiError.Parsing(details, this)
+        is SerializationException -> ApiError.Parsing(details, this)
         // You could add more specific network checks here, e.g.:
         // is java.net.UnknownHostException -> ApiError.Network(details, this)
         else -> ApiError.Unknown(details, this)

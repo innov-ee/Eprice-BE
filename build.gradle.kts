@@ -37,6 +37,8 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktor_version")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:$ktor_version")
 
+    implementation("io.ktor:ktor-client-content-negotiation:${ktor_version}")
+
     // Jackson for XML Parsing
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.17.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.0")
