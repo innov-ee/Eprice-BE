@@ -37,6 +37,9 @@ private class NoOpPriceCache : PriceCache {
     override fun get(key: String): List<DomainEnergyPrice>? = null
     override fun put(key: String, prices: List<DomainEnergyPrice>) { /* Do nothing */
     }
+
+    override fun clear() { /* Do nothing */
+    }
 }
 
 class ApplicationTest {

@@ -37,6 +37,11 @@ interface PriceCache {
      * @param prices The list of prices to store.
      */
     fun put(key: String, prices: List<DomainEnergyPrice>)
+
+    /**
+     * Clears all entries from the cache (memory and persistent storage).
+     */
+    fun clear()
 }
 
 /**
@@ -91,6 +96,28 @@ class InMemoryPriceCache(
         cache[key] = CacheEntry(prices, expiry)
         // Save to disk asynchronously
         saveCacheAsync()
+    }
+
+    override fun clear() {
+        // 1. Clear in-memory map
+        cache.clear()
+        println("In-memory cache cleared.")
+
+        // 2. Clear backing file (asynchronously, like save)
+        scope.launch {
+            try {
+                val deleted = Files.deleteIfExists(cacheFile)
+                if (deleted) {
+                    println("Cache file $cacheFile deleted.")
+                } else {
+                    println("Cache file $cacheFile did not exist.")
+                }
+            } catch (e: Exception) {
+                // Log the error, but don't crash the application
+                println("Failed to delete cache file $cacheFile. Error: ${e.message}")
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun loadCache() {
