@@ -1,6 +1,5 @@
-package ee.innov.eprice.data.remote
+package ee.innov.eprice.data.elering
 
-import ee.innov.eprice.data.remote.dto.EleringPriceResponse
 import ee.innov.eprice.domain.model.EleringApiException
 import ee.innov.eprice.domain.model.NoDataFoundException
 import io.ktor.client.HttpClient
@@ -14,19 +13,23 @@ import java.time.format.DateTimeFormatter
 
 class EleringService(
     private val client: HttpClient,
-    private val countryCode: String
 ) {
     // Elering API uses ISO 8601 format (UTC)
     private val formatter = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC)
 
     /**
      * Fetches prices from Elering.
+     * @param countryCode The 2-letter country code (e.g., "EE", "FI") to extract from the response.
      * @throws EleringApiException if the API returns an error.
-     * @throws NoDataFoundException if the API returns no data.
+     * @throws NoDataFoundException if the API returns no data for the specified country.
      * @throws io.ktor.client.plugins.HttpRequestTimeoutException on timeout.
      * @throws kotlinx.serialization.SerializationException on parsing error.
      */
-    suspend fun fetchPrices(start: Instant, end: Instant): EleringPriceResponse {
+    suspend fun fetchPrices(
+        countryCode: String,
+        start: Instant,
+        end: Instant
+    ): EleringPriceResponse {
         val periodStart = formatter.format(start)
         val periodEnd = formatter.format(end)
 
@@ -34,8 +37,6 @@ class EleringService(
             url {
                 parameters.append("start", periodStart)
                 parameters.append("end", periodEnd)
-                // Elering uses country codes like 'EE', 'LT', 'LV', 'FI'
-                parameters.append("country_code", countryCode)
             }
         }
 
@@ -48,9 +49,9 @@ class EleringService(
 
         val priceResponse = response.body<EleringPriceResponse>()
 
-        if (!priceResponse.success || priceResponse.data.isEmpty()) {
+        if (!priceResponse.success || !priceResponse.data.containsKey(countryCode)) {
             throw NoDataFoundException(
-                "Elering reported no data for period $periodStart - $periodEnd"
+                "Elering reported no data for $countryCode in period $periodStart - $periodEnd"
             )
         }
 

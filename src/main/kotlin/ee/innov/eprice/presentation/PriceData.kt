@@ -1,4 +1,4 @@
-package ee.innov.eprice.presentation.dto
+package ee.innov.eprice.presentation
 
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import kotlinx.serialization.SerialName

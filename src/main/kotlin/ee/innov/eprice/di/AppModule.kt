@@ -3,22 +3,28 @@ package ee.innov.eprice.di
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import ee.innov.eprice.data.remote.EleringService
-import ee.innov.eprice.data.remote.EntsoeService
-import ee.innov.eprice.data.repository.EnergyPriceRepositoryImpl
-import ee.innov.eprice.domain.repository.EnergyPriceRepository
-import ee.innov.eprice.domain.usecase.GetEnergyPricesUseCase
+import ee.innov.eprice.data.EnergyPriceRepositoryImpl
+import ee.innov.eprice.data.elering.EleringService
+import ee.innov.eprice.data.entsoe.EntsoeService
+import ee.innov.eprice.domain.EnergyPriceRepository
+import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import org.slf4j.LoggerFactory
 
 val appModule = module {
 
     single {
+        val clientLogger = LoggerFactory.getLogger("ee.innov.eprice.httpclient")
+
         HttpClient(CIO) {
             install(HttpTimeout) {
                 requestTimeoutMillis = 15000
@@ -28,6 +34,15 @@ val appModule = module {
             // Add JSON support for Ktor client (for Elering)
             install(ContentNegotiation) {
                 json()
+            }
+
+            install(Logging) {
+                logger = object : Logger {
+                    override fun log(message: String) {
+                        clientLogger.info(message)
+                    }
+                }
+                level = LogLevel.INFO
             }
         }
     }
@@ -44,24 +59,16 @@ val appModule = module {
             ?: throw IllegalStateException("ENTSOE_API_KEY environment variable is not set.")
     }
 
-    single(qualifier = named("entsoeBiddingZone")) { "10Y1001A1001A39I" }
-
     single {
         EntsoeService(
             client = get(),
             xmlMapper = get(),
-            apiKey = get(qualifier = named("entsoeApiKey")),
-            biddingZone = get(qualifier = named("entsoeBiddingZone"))
+            apiKey = get(qualifier = named("entsoeApiKey"))
         )
     }
 
-    single(qualifier = named("eleringCountryCode")) { "EE" }
-
     single {
-        EleringService(
-            client = get(),
-            countryCode = get(qualifier = named("eleringCountryCode"))
-        )
+        EleringService(client = get())
     }
 
     single<EnergyPriceRepository> {

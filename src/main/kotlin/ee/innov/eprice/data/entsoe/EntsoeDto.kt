@@ -1,4 +1,4 @@
-package ee.innov.eprice.data.remote.dto
+package ee.innov.eprice.data.entsoe
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
@@ -60,4 +60,16 @@ fun PublicationMarketDocument.toDomainEnergyPrices(): List<DomainEnergyPrice> {
             }
         }
     }
+}
+
+/**
+ * Maps a 2-letter country code to its corresponding ENTSO-E Bidding Zone.
+ * This mapping must be expanded to support new countries.
+ */
+internal fun String.toBiddingZone(): String? = when (this.uppercase()) {
+    "EE" -> "10Y1001A1001A39I"
+    "FI" -> "10YFI-1--------U"
+    "LT" -> "10YLT-1001A0008Q"
+    "LV" -> "10YLV-1001A00074"
+    else -> null
 }

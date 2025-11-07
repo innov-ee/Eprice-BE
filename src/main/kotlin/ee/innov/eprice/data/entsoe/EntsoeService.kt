@@ -1,7 +1,6 @@
-package ee.innov.eprice.data.remote
+package ee.innov.eprice.data.entsoe
 
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import ee.innov.eprice.data.remote.dto.PublicationMarketDocument
 import ee.innov.eprice.domain.model.EntsoeApiException
 import ee.innov.eprice.domain.model.NoDataFoundException
 import io.ktor.client.HttpClient
@@ -16,20 +15,24 @@ import java.time.format.DateTimeFormatter
 class EntsoeService(
     private val client: HttpClient,
     private val xmlMapper: XmlMapper,
-    private val apiKey: String,
-    private val biddingZone: String
+    private val apiKey: String
 ) {
     private val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm")
         .withZone(ZoneOffset.UTC)
 
     /**
      * Fetches the raw XML data and parses it.
+     * @param biddingZone The ENTSO-E bidding zone identifier.
      * @throws EntsoeApiException if the API key is missing or the API returns an error.
      * @throws NoDataFoundException if the API returns a "no data" message.
      * @throws io.ktor.client.plugins.HttpRequestTimeoutException on timeout.
      * @throws com.fasterxml.jackson.core.JsonProcessingException on parsing error.
      */
-    suspend fun fetchPrices(start: Instant, end: Instant): PublicationMarketDocument {
+    suspend fun fetchPrices(
+        biddingZone: String,
+        start: Instant,
+        end: Instant
+    ): PublicationMarketDocument {
         if (apiKey.isBlank()) {
             throw EntsoeApiException(500, "ENTSOE_API_KEY is not set.")
         }
@@ -53,7 +56,7 @@ class EntsoeService(
             if (xmlString.contains("No matching data found", ignoreCase = true)) {
                 // This is a special case, not a fatal error
                 throw NoDataFoundException(
-                    "No matching data found for period $periodStart - $periodEnd"
+                    "No matching data found for bidding zone $biddingZone in period $periodStart - $periodEnd"
                 )
             }
             // This is a real API error

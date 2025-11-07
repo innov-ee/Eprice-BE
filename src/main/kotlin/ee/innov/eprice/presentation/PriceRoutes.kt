@@ -1,8 +1,7 @@
 package ee.innov.eprice.presentation
 
+import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.model.ApiError
-import ee.innov.eprice.domain.usecase.GetEnergyPricesUseCase
-import ee.innov.eprice.presentation.dto.toPriceData
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.application.log
@@ -26,8 +25,10 @@ fun Route.priceRoutes() {
         call.respond("All good")
     }
 
-    get("/api/prices") {
-        val result = getEnergyPricesUseCase.execute()
+    get("/api/prices/{countryCode?}") {
+        val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
+
+        val result = getEnergyPricesUseCase.execute(countryCode)
 
         result.onSuccess { domainPrices ->
             // Map domain models to presentation DTOs
@@ -35,7 +36,7 @@ fun Route.priceRoutes() {
             call.respond(HttpStatusCode.OK, responseData)
 
         }.onFailure { error ->
-            call.application.log.error("Error fetching prices", error)
+            call.application.log.error("Error fetching prices for $countryCode", error)
 
             when (error) {
                 is ApiError.Timeout -> call.respond(

@@ -29,6 +29,8 @@ dependencies {
     implementation("io.ktor:ktor-client-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-cio-jvm:$ktor_version")
 
+    implementation("io.ktor:ktor-client-logging-jvm:${ktor_version}")
+
     // Koin
     implementation("io.insert-koin:koin-ktor:${koinVersion}")
     implementation("io.insert-koin:koin-logger-slf4j:${koinVersion}")
