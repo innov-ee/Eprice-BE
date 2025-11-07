@@ -4,6 +4,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -76,6 +78,7 @@ class FileBackedDailyAveragePriceCache(
 
     // A dedicated scope for file I/O
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val persistMutex = Mutex()
 
     private val json = Json {
         prettyPrint = true
@@ -159,7 +162,9 @@ class FileBackedDailyAveragePriceCache(
 
     private fun saveCacheAsync() {
         scope.launch {
-            persistCache()
+            persistMutex.withLock {
+                persistCache()
+            }
         }
     }
 

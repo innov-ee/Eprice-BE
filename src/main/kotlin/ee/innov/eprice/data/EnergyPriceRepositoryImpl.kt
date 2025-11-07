@@ -21,7 +21,8 @@ class EnergyPriceRepositoryImpl(
     override suspend fun getPrices(
         countryCode: String,
         start: Instant,
-        end: Instant
+        end: Instant,
+        cacheResults: Boolean,
     ): Result<List<DomainEnergyPrice>> {
 
         val cacheKey = "${countryCode}_${start}_$end"
@@ -33,9 +34,11 @@ class EnergyPriceRepositoryImpl(
 
         val networkResult = fetchFromNetwork(countryCode, start, end)
 
-        networkResult.onSuccess { prices ->
-            if (prices.isNotEmpty()) {
-                cache.put(cacheKey, prices)
+        if (cacheResults) {
+            networkResult.onSuccess { prices ->
+                if (prices.isNotEmpty()) {
+                    cache.put(cacheKey, prices)
+                }
             }
         }
 

@@ -59,9 +59,15 @@ class GetRollingAveragePriceUseCase(
                                 date.plusDays(1).atStartOfDay(ZoneOffset.UTC).minusSeconds(1)
                                     .toInstant()
 
-                            // Use repository (which has its own 1-hour cache for raw data)
-                            val result =
-                                energyPriceRepository.getPrices(countryCode, dayStart, dayEnd)
+
+                            val result = energyPriceRepository.getPrices(
+                                countryCode = countryCode,
+                                start = dayStart,
+                                end = dayEnd,
+                                // dont cache, as its just noise
+                                cacheResults = false
+                            )
+
 
                             result.getOrNull()?.let { prices ->
                                 if (prices.isNotEmpty()) {
