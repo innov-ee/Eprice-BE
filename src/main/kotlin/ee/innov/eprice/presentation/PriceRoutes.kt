@@ -1,8 +1,7 @@
 package ee.innov.eprice.presentation
 
+import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.model.ApiError
-import ee.innov.eprice.domain.usecase.GetEnergyPricesUseCase
-import ee.innov.eprice.presentation.dto.toPriceData
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.application.log

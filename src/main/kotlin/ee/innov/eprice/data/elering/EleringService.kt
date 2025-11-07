@@ -1,6 +1,5 @@
-package ee.innov.eprice.data.remote
+package ee.innov.eprice.data.elering
 
-import ee.innov.eprice.data.remote.dto.EleringPriceResponse
 import ee.innov.eprice.domain.model.EleringApiException
 import ee.innov.eprice.domain.model.NoDataFoundException
 import io.ktor.client.HttpClient

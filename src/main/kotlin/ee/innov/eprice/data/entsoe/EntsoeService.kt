@@ -1,7 +1,6 @@
-package ee.innov.eprice.data.remote
+package ee.innov.eprice.data.entsoe
 
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import ee.innov.eprice.data.remote.dto.PublicationMarketDocument
 import ee.innov.eprice.domain.model.EntsoeApiException
 import ee.innov.eprice.domain.model.NoDataFoundException
 import io.ktor.client.HttpClient

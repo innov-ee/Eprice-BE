@@ -1,7 +1,6 @@
-package ee.innov.eprice.domain.usecase
+package ee.innov.eprice.domain
 
 import ee.innov.eprice.domain.model.DomainEnergyPrice
-import ee.innov.eprice.domain.repository.EnergyPriceRepository
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 

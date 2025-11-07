@@ -1,4 +1,4 @@
-package ee.innov.eprice.data.remote.dto
+package ee.innov.eprice.data.entsoe
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper

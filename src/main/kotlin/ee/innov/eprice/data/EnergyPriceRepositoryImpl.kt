@@ -1,12 +1,13 @@
-package ee.innov.eprice.data.repository
+package ee.innov.eprice.data
 
-import ee.innov.eprice.data.remote.EleringService
-import ee.innov.eprice.data.remote.EntsoeService
-import ee.innov.eprice.data.remote.dto.toDomainEnergyPrices
+import ee.innov.eprice.data.elering.EleringService
+import ee.innov.eprice.data.elering.toDomainEnergyPrices
+import ee.innov.eprice.data.entsoe.EntsoeService
+import ee.innov.eprice.data.entsoe.toDomainEnergyPrices
+import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.toApiError
-import ee.innov.eprice.domain.repository.EnergyPriceRepository
 import java.time.Instant
 
 class EnergyPriceRepositoryImpl(

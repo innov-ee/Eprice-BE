@@ -3,11 +3,11 @@ package ee.innov.eprice.di
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import ee.innov.eprice.data.remote.EleringService
-import ee.innov.eprice.data.remote.EntsoeService
-import ee.innov.eprice.data.repository.EnergyPriceRepositoryImpl
-import ee.innov.eprice.domain.repository.EnergyPriceRepository
-import ee.innov.eprice.domain.usecase.GetEnergyPricesUseCase
+import ee.innov.eprice.data.EnergyPriceRepositoryImpl
+import ee.innov.eprice.data.elering.EleringService
+import ee.innov.eprice.data.entsoe.EntsoeService
+import ee.innov.eprice.domain.EnergyPriceRepository
+import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout

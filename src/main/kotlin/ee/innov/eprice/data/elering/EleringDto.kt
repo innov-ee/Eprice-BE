@@ -1,4 +1,4 @@
-package ee.innov.eprice.data.remote.dto
+package ee.innov.eprice.data.elering
 
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import kotlinx.serialization.SerialName

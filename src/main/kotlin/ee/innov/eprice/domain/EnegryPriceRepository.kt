@@ -1,4 +1,4 @@
-package ee.innov.eprice.domain.repository
+package ee.innov.eprice.domain
 
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import java.time.Instant
