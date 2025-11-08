@@ -12,6 +12,7 @@ interface EnergyPriceRepository {
     suspend fun getPrices(
         countryCode: String,
         start: Instant,
-        end: Instant
+        end: Instant,
+        cacheResults: Boolean = true
     ): Result<List<DomainEnergyPrice>>
 }
