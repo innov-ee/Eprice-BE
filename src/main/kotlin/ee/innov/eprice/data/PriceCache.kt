@@ -2,25 +2,12 @@ package ee.innov.eprice.data
 
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.util.InstantSerializer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.nio.file.StandardCopyOption
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
-import kotlin.io.path.isReadable
 
 /**
  * A simple in-memory cache interface for storing energy prices.
@@ -46,39 +33,35 @@ interface PriceCache {
     fun clear()
 }
 
+@Serializable
+private data class CacheEntry(
+    val data: List<DomainEnergyPrice>,
+    @Serializable(with = InstantSerializer::class)
+    val expiryTime: Instant
+)
+
+/**
+ * The type alias for the data structure that gets serialized to disk.
+ * We serialize a simple Map, not the ConcurrentHashMap.
+ */
+private typealias PriceCacheDto = Map<String, CacheEntry>
+
 /**
  * An in-memory implementation of [PriceCache] using [ConcurrentHashMap]
  * and a simple Time-to-Live (TTL) expiration.
  *
- * This implementation persists the cache to a JSON file.
- * - **On Init:** Loads the cache from the file.
+ * This implementation persists the cache to a JSON file by inheriting from [BaseFileCache].
+ * - **On Init:** Loads and filters the cache from the file.
  * - **On Put:** Saves the entire cache to the file asynchronously.
  */
 class InMemoryPriceCache(
-    private val cacheFile: Path = Paths.get("eprice-cache.json")
-) : PriceCache {
-
-    @Serializable
-    private data class CacheEntry(
-        val data: List<DomainEnergyPrice>,
-        @Serializable(with = InstantSerializer::class)
-        val expiryTime: Instant
-    )
+    cacheFile: Path = Paths.get("eprice-cache.json")
+) : BaseFileCache(cacheFile), PriceCache {
 
     private val cache = ConcurrentHashMap<String, CacheEntry>()
 
     // Cache data for 1 hour.
     private val cacheDuration = Duration.ofMinutes(60)
-
-    // A dedicated scope for file I/O
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val persistMutex = Mutex()
-
-    // A self-contained serializer
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
 
     init {
         loadCache()
@@ -97,8 +80,8 @@ class InMemoryPriceCache(
     override fun put(key: String, prices: List<DomainEnergyPrice>) {
         val expiry = Instant.now().plus(cacheDuration)
         cache[key] = CacheEntry(prices, expiry)
-        // Save to disk asynchronously
-        saveCacheAsync()
+        // Save to disk asynchronously. Pass a snapshot (.toMap()) for thread safety.
+        saveToFileAsync<PriceCacheDto>(cache.toMap())
     }
 
     override fun clear() {
@@ -106,84 +89,23 @@ class InMemoryPriceCache(
         cache.clear()
         println("In-memory cache cleared.")
 
-        // 2. Clear backing file (asynchronously, like save)
-        scope.launch {
-            persistMutex.withLock {
-                try {
-                    val deleted = Files.deleteIfExists(cacheFile)
-                    if (deleted) {
-                        println("Cache file $cacheFile deleted.")
-                    } else {
-                        println("Cache file $cacheFile did not exist.")
-                    }
-                } catch (e: Exception) {
-                    // Log the error, but don't crash the application
-                    println("Failed to delete cache file $cacheFile. Error: ${e.message}")
-                    e.printStackTrace()
-                }
-            }
-        }
+        // 2. Clear backing file (asynchronously)
+        clearFileAsync()
     }
 
+    /**
+     * Loads the cache from disk and filters out expired entries.
+     */
     private fun loadCache() {
-        if (!cacheFile.exists() || !cacheFile.isReadable()) {
-            println("No cache file found or readable at $cacheFile. Starting with an empty cache.")
-            return
-        }
+        // 1. Load the DTO from file using the base class method
+        val deserializedMap = loadFromFile<PriceCacheDto>() ?: return
 
-        try {
-            val content = Files.readString(cacheFile)
-            val deserializedMap: Map<String, CacheEntry> = json.decodeFromString(content)
+        // 2. Filter out expired entries before loading into memory
+        val now = Instant.now()
+        val validEntries = deserializedMap.filterValues { it.expiryTime.isAfter(now) }
 
-            // Filter out expired entries before loading
-            val now = Instant.now()
-            val validEntries = deserializedMap.filterValues { it.expiryTime.isAfter(now) }
-
-            cache.putAll(validEntries)
-            println("Loaded ${validEntries.size} valid cache entries from $cacheFile.")
-        } catch (e: Exception) {
-            println("Failed to load or parse cache file $cacheFile. Starting with an empty cache. Error: ${e.message}")
-            // If file is corrupt, delete it to start fresh next time
-            try {
-                cacheFile.deleteIfExists()
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    private fun saveCacheAsync() {
-        scope.launch {
-            persistMutex.withLock {
-                persistCache()
-            }
-        }
-    }
-
-    private fun persistCache() {
-        // Create a stable snapshot of the cache for serialization
-        val cacheSnapshot = cache.toMap()
-        if (cacheSnapshot.isEmpty()) return // Nothing to save
-
-        try {
-            val jsonString = json.encodeToString(cacheSnapshot)
-
-            // Atomic write: Write to temp file, then rename
-            val tempFile = cacheFile.resolveSibling("${cacheFile.fileName}.tmp")
-
-            Files.newBufferedWriter(tempFile).use { writer ->
-                writer.write(jsonString)
-            }
-
-            Files.move(
-                tempFile,
-                cacheFile,
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE
-            )
-        } catch (e: Exception) {
-            // Log the error, but don't crash the application
-            println("Failed to persist cache to $cacheFile. Error: ${e.message}")
-            e.printStackTrace()
-        }
+        // 3. Populate the in-memory cache
+        cache.putAll(validEntries)
+        println("Loaded ${validEntries.size} valid cache entries from $cacheFile.")
     }
 }

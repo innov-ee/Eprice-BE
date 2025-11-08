@@ -1,24 +1,11 @@
 package ee.innov.eprice.data
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.nio.file.StandardCopyOption
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
-import kotlin.io.path.isReadable
 
 /**
  * Interface for a cache that stores calculated average daily prices.
@@ -62,36 +49,32 @@ interface DailyAveragePriceCache {
 /**
  * A file-backed implementation of [DailyAveragePriceCache].
  *
- * This cache stores calculated daily averages and persists them to "daily-average-cache.json".
+ * This cache stores calculated daily averages and persists them by inheriting from [BaseFileCache].
  * It does not use TTL/expiry, as a historical day's average price is considered final.
  *
  * The in-memory structure is: `Map<CountryCode, Map<DateString, Price>>`
  * e.g., "EE" -> {"2023-10-01" -> 0.123, "2023-10-02" -> 0.456}
  */
 class FileBackedDailyAveragePriceCache(
-    private val cacheFile: Path = Paths.get("daily-average-cache.json")
-) : DailyAveragePriceCache {
+    cacheFile: Path = Paths.get("daily-average-cache.json")
+) : BaseFileCache(cacheFile), DailyAveragePriceCache {
 
+    /**
+     * This is the DTO (Data Transfer Object) that will be serialized to JSON.
+     * It uses standard Maps, which are easily serializable.
+     */
     @Serializable
     private data class DailyCacheFile(
-        // *** FIX: Use standard Map for serialization ***
         val data: Map<String, Map<String, Double>> = emptyMap()
     )
 
-    // The *in-memory* cache remains a ConcurrentHashMap for thread-safety
+    // The *in-memory* cache is a ConcurrentHashMap for thread-safety.
+    // This is different from the DTO.
     private val cache: ConcurrentHashMap<String, ConcurrentHashMap<String, Double>>
 
-    // A dedicated scope for file I/O
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val persistMutex = Mutex()
-
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
-
     init {
-        cache = loadCache()
+        // Load the cache from the file and transform it into the in-memory structure
+        cache = loadCacheFromFile()
     }
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE // "yyyy-MM-dd"
@@ -108,8 +91,9 @@ class FileBackedDailyAveragePriceCache(
         val countryCache = cache.getOrPut(ucCountryCode) { ConcurrentHashMap() }
         countryCache[dateString] = averagePrice
 
-        // Save to disk asynchronously
-        saveCacheAsync()
+        // Save to disk asynchronously.
+        // We pass a new DTO instance containing the current cache state.
+        saveToFileAsync(DailyCacheFile(cache))
     }
 
     override fun getRange(
@@ -128,22 +112,8 @@ class FileBackedDailyAveragePriceCache(
         cache.clear()
         println("In-memory daily average cache cleared.")
 
-        scope.launch {
-            persistMutex.withLock {
-                try {
-                    val deleted = Files.deleteIfExists(cacheFile)
-                    if (deleted) {
-                        println("Cache file $cacheFile deleted.")
-                    } else {
-                        println("Cache file $cacheFile did not exist.")
-                    }
-                } catch (e: Exception) {
-                    // Log the error, but don't crash the application
-                    println("Failed to delete cache file $cacheFile. Error: ${e.message}")
-                    e.printStackTrace()
-                }
-            }
-        }
+        // Clear the backing file asynchronously
+        clearFileAsync()
     }
 
     // Helper to allow safe transformation of map keys
@@ -157,68 +127,25 @@ class FileBackedDailyAveragePriceCache(
         return result
     }
 
-    private fun loadCache(): ConcurrentHashMap<String, ConcurrentHashMap<String, Double>> {
-        if (!cacheFile.exists() || !cacheFile.isReadable()) {
-            println("No daily average cache file found or readable at $cacheFile. Starting with an empty cache.")
+    /**
+     * Loads the cache from disk and transforms the DTO into the
+     * in-memory ConcurrentHashMap structure.
+     */
+    private fun loadCacheFromFile(): ConcurrentHashMap<String, ConcurrentHashMap<String, Double>> {
+        // 1. Load the DTO from file using the base class method
+        val deserialized = loadFromFile<DailyCacheFile>()
+        if (deserialized == null) {
+            println("No daily average cache file found. Starting with an empty cache.")
             return ConcurrentHashMap()
         }
 
-        return try {
-            val content = Files.readString(cacheFile)
-            // 1. Deserialize into the simple DTO
-            val deserialized: DailyCacheFile = json.decodeFromString(content)
-            println("Loaded ${deserialized.data.values.sumOf { it.size }} daily average entries from $cacheFile.")
+        println("Loaded ${deserialized.data.values.sumOf { it.size }} daily average entries from $cacheFile.")
 
-            // *** FIX: Convert from Map to ConcurrentHashMap for the in-memory instance ***
-            val concurrentMap = ConcurrentHashMap<String, ConcurrentHashMap<String, Double>>()
-            deserialized.data.forEach { (country, dateMap) ->
-                concurrentMap[country] = ConcurrentHashMap(dateMap)
-            }
-            concurrentMap
-
-        } catch (e: Exception) {
-            println("Failed to load or parse daily average cache file $cacheFile. Starting with an empty cache. Error: ${e.message}")
-            // If file is corrupt, delete it to start fresh next time
-            try {
-                cacheFile.deleteIfExists()
-            } catch (_: Exception) {
-            }
-            ConcurrentHashMap()
+        // 2. Transform the deserialized Map into the in-memory ConcurrentHashMap structure
+        val concurrentMap = ConcurrentHashMap<String, ConcurrentHashMap<String, Double>>()
+        deserialized.data.forEach { (country, dateMap) ->
+            concurrentMap[country] = ConcurrentHashMap(dateMap)
         }
-    }
-
-    private fun saveCacheAsync() {
-        scope.launch {
-            persistMutex.withLock {
-                persistCache()
-            }
-        }
-    }
-
-    private fun persistCache() {
-        // We pass the in-memory 'cache' (a ConcurrentHashMap) to the DTO
-        // which expects a standard 'Map', and serialization works.
-        val cacheSnapshot = DailyCacheFile(cache)
-        if (cacheSnapshot.data.isEmpty()) return // Nothing to save
-
-        try {
-            val jsonString = json.encodeToString(cacheSnapshot)
-
-            val tempFile = cacheFile.resolveSibling("${cacheFile.fileName}.tmp")
-
-            Files.newBufferedWriter(tempFile).use { writer ->
-                writer.write(jsonString)
-            }
-
-            Files.move(
-                tempFile,
-                cacheFile,
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE
-            )
-        } catch (e: Exception) {
-            println("Failed to persist daily average cache to $cacheFile. Error: ${e.message}")
-            e.printStackTrace()
-        }
+        return concurrentMap
     }
 }

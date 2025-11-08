@@ -26,7 +26,7 @@ class GetRollingAveragePriceUseCase(
      * @param days The number of days to include in the average (e.g., 30).
      * @return A Result containing the average price, or an error if data cannot be fetched.
      */
-    suspend fun execute(countryCode: String, days: Int = 30): Result<RollingAverage> {
+    suspend fun execute(countryCode: String, days: Int): Result<RollingAverage> {
         if (days <= 0) {
             return Result.failure(IllegalArgumentException("Number of days must be positive."))
         }

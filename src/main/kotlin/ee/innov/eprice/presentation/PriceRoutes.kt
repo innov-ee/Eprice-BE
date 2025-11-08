@@ -63,12 +63,9 @@ fun Route.priceRoutes() {
         }
     }
 
-    get("/api/prices/{countryCode}/rolling-average-30d") {
+    get("/api/prices/{countryCode}/avg") {
         val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
-        // You could also get 'days' from query param:
-        // val days = call.request.queryParameters["days"]?.toIntOrNull() ?: 30
-        val days = 30 // Hardcode for now as per endpoint name
-
+        val days = 5
         val result = getRollingAveragePriceUseCase.execute(countryCode, days)
 
         result.onSuccess { rollingAverage ->
