@@ -7,66 +7,30 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Interface for a cache that stores calculated average daily prices.
- */
 interface DailyAveragePriceCache {
-    /**
-     * Retrieves the average price for a specific country and date.
-     * @param countryCode The 2-letter country code.
-     * @param date The specific date.
-     * @return The average price if it exists in the cache, otherwise null.
-     */
+
     fun get(countryCode: String, date: LocalDate): Double?
 
-    /**
-     * Stores the average price for a specific country and date.
-     * @param countryCode The 2-letter country code.
-     * @param date The specific date.
-     * @param averagePrice The calculated average price for that day.
-     */
     fun put(countryCode: String, date: LocalDate, averagePrice: Double)
 
-    /**
-     * Gets all cached prices for a given country within a date range.
-     * @param countryCode The 2-letter country code.
-     * @param startDate The start of the period (inclusive).
-     * @param endDate The end of the period (inclusive).
-     * @return A map of [LocalDate] to [Double] for all cached entries found.
-     */
     fun getRange(
         countryCode: String,
         startDate: LocalDate,
         endDate: LocalDate
     ): Map<LocalDate, Double>
 
-    /**
-     * Clears all entries from the cache (memory and persistent storage).
-     */
     fun clear()
 }
 
-/**
- * A file-backed implementation of [DailyAveragePriceCache].
- *
- * This cache stores calculated daily averages and persists them by inheriting from [BaseFileCache].
- * It does not use TTL/expiry, as a historical day's average price is considered final.
- *
- * The in-memory structure is: `Map<CountryCode, Map<DateString, Price>>`
- * e.g., "EE" -> {"2023-10-01" -> 0.123, "2023-10-02" -> 0.456}
- */
+@Serializable
+private data class DailyCacheFile(
+    val data: Map<String, Map<String, Double>> = emptyMap()
+)
+
 class FileBackedDailyAveragePriceCache(
     cacheFile: Path = Paths.get("daily-average-cache.json")
 ) : BaseFileCache(cacheFile), DailyAveragePriceCache {
 
-    /**
-     * This is the DTO (Data Transfer Object) that will be serialized to JSON.
-     * It uses standard Maps, which are easily serializable.
-     */
-    @Serializable
-    private data class DailyCacheFile(
-        val data: Map<String, Map<String, Double>> = emptyMap()
-    )
 
     // The *in-memory* cache is a ConcurrentHashMap for thread-safety.
     // This is different from the DTO.
@@ -113,7 +77,6 @@ class FileBackedDailyAveragePriceCache(
         cache.clear()
         println("In-memory daily average cache cleared.")
 
-        // Clear the backing file asynchronously
         clearFileAsync()
     }
 
