@@ -93,6 +93,7 @@ class FileBackedDailyAveragePriceCache(
 
         // Save to disk asynchronously.
         // We pass a new DTO instance containing the current cache state.
+        // TODO this is called in a loop, every time requiring write, its ineficcient
         saveToFileAsync(DailyCacheFile(cache))
     }
 
