@@ -6,7 +6,9 @@ import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.NoDataFoundException
+import ee.innov.eprice.monitoring.ServiceMonitor
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.application.log
 import io.ktor.server.response.respond
@@ -23,9 +25,20 @@ fun Route.priceRoutes() {
     val getRollingAveragePriceUseCase: GetRollingAveragePriceUseCase by inject()
     val priceCache: PriceCache by inject()
     val dailyAveragePriceCache: DailyAveragePriceCache by inject()
+    val monitor: ServiceMonitor by inject()
+
+    // Interceptor to count all incoming requests
+    intercept(ApplicationCallPipeline.Plugins) {
+        monitor.incrementIncoming()
+        proceed()
+    }
 
     get("/health") {
         call.respond(HttpStatusCode.OK, mapOf("status" to "UP"))
+    }
+
+    get("/monitor") {
+        call.respond(HttpStatusCode.OK, monitor.getStats())
     }
 
     get("/api") {
@@ -59,7 +72,7 @@ fun Route.priceRoutes() {
 
         }.onFailure { error ->
             call.application.log.error("Error fetching prices for $countryCode", error)
-            respondWithError(call, error) // +++ Refactored to helper
+            respondWithError(call, error)
         }
     }
 
@@ -71,7 +84,7 @@ fun Route.priceRoutes() {
         result.onSuccess { rollingAverage ->
             call.respond(HttpStatusCode.OK, rollingAverage)
         }.onFailure { error ->
-            call.application.log.error("Error fetching 30d rolling average for $countryCode", error)
+            call.application.log.error("Error fetching rolling average for $countryCode", error)
             respondWithError(call, error)
         }
     }
