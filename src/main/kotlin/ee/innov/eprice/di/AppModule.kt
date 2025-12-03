@@ -1,3 +1,4 @@
+// file: src/main/kotlin/ee/innov/eprice/di/AppModule.kt
 package ee.innov.eprice.di
 
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -13,9 +14,11 @@ import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
+import ee.innov.eprice.monitoring.ServiceMonitor
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
@@ -27,8 +30,11 @@ import org.slf4j.LoggerFactory
 
 val appModule = module {
 
+    single { ServiceMonitor() }
+
     single {
         val clientLogger = LoggerFactory.getLogger("ee.innov.eprice.httpclient")
+        val monitor = get<ServiceMonitor>()
 
         HttpClient(CIO) {
             install(HttpTimeout) {
@@ -36,6 +42,14 @@ val appModule = module {
                 connectTimeoutMillis = 10000
                 socketTimeoutMillis = 10000
             }
+
+
+            install(createClientPlugin("OutgoingMonitor") {
+                onRequest { _, _ ->
+                    monitor.incrementOutgoing()
+                }
+            })
+
             // Add JSON support for Ktor client (for Elering)
             install(ContentNegotiation) {
                 json()
@@ -88,7 +102,7 @@ val appModule = module {
         EnergyPriceRepositoryImpl(
             entsoeService = get(),
             eleringService = get(),
-            cache = get() // Inject the PriceCache (hourly)
+            cache = get()
         )
     }
 
