@@ -38,7 +38,7 @@ fun Route.priceRoutes() {
         call.respond(HttpStatusCode.OK, mapOf("status" to "UP"))
     }
 
-    get("/metrics") {
+    get("/monitor") {
         call.respond(HttpStatusCode.OK, monitor.getStats())
     }
 
