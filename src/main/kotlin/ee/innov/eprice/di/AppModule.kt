@@ -1,4 +1,3 @@
-// file: src/main/kotlin/ee/innov/eprice/di/AppModule.kt
 package ee.innov.eprice.di
 
 import com.fasterxml.jackson.databind.DeserializationFeature
