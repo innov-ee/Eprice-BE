@@ -30,10 +30,9 @@ class ServiceMonitor {
     fun getStats(): ServiceStats {
         val now = Instant.now()
         val uptimeDuration = Duration.between(startTime, now)
-        val uptimeSeconds = uptimeDuration.seconds.coerceAtLeast(1) // Avoid div by zero
 
-        // Calculate hours (use double for division)
-        val hoursUp = uptimeSeconds / 3600.0
+        // coercing to 1 to avoid mega averages when service is in its first minutes.
+        val hoursForAvg = (uptimeDuration.seconds / 3600.0).coerceAtLeast(1.0)
 
         val inTotal = incomingCounter.get()
         val outTotal = outgoingCounter.get()
@@ -42,9 +41,8 @@ class ServiceMonitor {
             uptime = formatDuration(uptimeDuration),
             totalIncomingRequests = inTotal,
             totalOutgoingRequests = outTotal,
-            // Calculate rate: Count / Hours
-            avgIncomingPerHour = if (hoursUp > 0) inTotal / hoursUp else 0.0,
-            avgOutgoingPerHour = if (hoursUp > 0) outTotal / hoursUp else 0.0
+            avgIncomingPerHour = inTotal / hoursForAvg,
+            avgOutgoingPerHour = outTotal / hoursForAvg
         )
     }
 
