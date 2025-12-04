@@ -78,7 +78,7 @@ fun Route.priceRoutes() {
 
     get("/api/prices/{countryCode}/avg") {
         val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
-        val days = 5
+        val days = 30
         val result = getRollingAveragePriceUseCase.execute(countryCode, days)
 
         result.onSuccess { rollingAverage ->
