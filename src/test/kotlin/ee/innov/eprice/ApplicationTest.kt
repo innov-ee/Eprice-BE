@@ -197,6 +197,46 @@ class ApplicationTest {
         )
     }
 
+    @Test
+    fun `GET prices stats should return 200 OK with aggregated statistics`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/api/prices/EE/stats?range=yesterday")
+
+                assertEquals(HttpStatusCode.OK, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""countryCode":"EE""""))
+                assertTrue(body.contains(""""minPrice":0.12"""))
+                assertTrue(body.contains(""""maxPrice":0.15"""))
+                assertTrue(body.contains(""""averagePrice":0.135"""))
+                assertTrue(body.contains(""""daysCalculated":1"""))
+            }
+        )
+    }
+
+    @Test
+    fun `GET prices stats with invalid days should return 400 BadRequest`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/api/prices/EE/stats?days=-5")
+
+                assertEquals(HttpStatusCode.BadRequest, response.status)
+            }
+        )
+    }
+
 
     private fun createMockEngineHandler(
         eleringContent: String,

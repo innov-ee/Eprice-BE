@@ -4,14 +4,17 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import ee.innov.eprice.data.DailyAveragePriceCache
+import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.EnergyPriceRepositoryImpl
 import ee.innov.eprice.data.FileBackedDailyAveragePriceCache
+import ee.innov.eprice.data.FileBackedDailyStatsCache
 import ee.innov.eprice.data.InMemoryPriceCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
+import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.monitoring.ServiceMonitor
 import io.ktor.client.HttpClient
@@ -97,6 +100,10 @@ val appModule = module {
         FileBackedDailyAveragePriceCache()
     }
 
+    single<DailyStatsCache> {
+        FileBackedDailyStatsCache()
+    }
+
     single<EnergyPriceRepository> {
         EnergyPriceRepositoryImpl(
             entsoeService = get(),
@@ -111,6 +118,13 @@ val appModule = module {
         GetRollingAveragePriceUseCase(
             energyPriceRepository = get(),
             dailyAveragePriceCache = get()
+        )
+    }
+
+    factory {
+        GetPriceStatisticsUseCase(
+            energyPriceRepository = get(),
+            dailyStatsCache = get()
         )
     }
 }

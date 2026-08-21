@@ -15,6 +15,10 @@ application {
     mainClass.set("ee.innov.eprice.ApplicationKt")
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
 repositories {
     mavenCentral()
 }
