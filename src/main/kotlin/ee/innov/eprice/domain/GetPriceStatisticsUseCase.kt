@@ -17,6 +17,11 @@ class GetPriceStatisticsUseCase(
     private val dailyStatsCache: DailyStatsCache
 ) {
 
+    companion object {
+        // Bounds the one-coroutine-per-missing-day fan-out below on oversized range requests.
+        private const val MAX_RANGE_DAYS = 60
+    }
+
     @Serializable
     data class PriceStatistics(
         val countryCode: String,
@@ -64,6 +69,11 @@ class GetPriceStatisticsUseCase(
         }
 
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
+        if (totalDays > MAX_RANGE_DAYS) {
+            return Result.failure(
+                IllegalArgumentException("Date range too large ($totalDays days); max is $MAX_RANGE_DAYS days.")
+            )
+        }
         val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
 
         // 1. Get cached daily stats for this range

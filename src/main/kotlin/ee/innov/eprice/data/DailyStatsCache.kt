@@ -56,6 +56,7 @@ class FileBackedDailyStatsCache(
         return cache[countryCode.uppercase()]?.get(dateString)
     }
 
+    // For multiple entries use putBatch instead - this writes the whole cache to disk on every call.
     override fun put(countryCode: String, date: LocalDate, stats: DailyStatEntry) {
         val ucCountryCode = countryCode.uppercase()
         val dateString = date.format(dateFormatter)
@@ -63,7 +64,7 @@ class FileBackedDailyStatsCache(
         val countryCache = cache.getOrPut(ucCountryCode) { ConcurrentHashMap() }
         countryCache[dateString] = stats
 
-        saveToFileAsync(DailyStatsCacheFile(cache))
+        writeCacheToFile()
     }
 
     override fun putBatch(countryCode: String, entries: Map<LocalDate, DailyStatEntry>) {
@@ -76,8 +77,10 @@ class FileBackedDailyStatsCache(
             countryCache[dateString] = stats
         }
 
-        saveToFileAsync(DailyStatsCacheFile(cache))
+        writeCacheToFile()
     }
+
+    private fun writeCacheToFile() = saveToFileAsync(DailyStatsCacheFile(snapshot()))
 
     override fun getRange(
         countryCode: String,
@@ -106,6 +109,10 @@ class FileBackedDailyStatsCache(
         }
         return result
     }
+
+    // Defensive copy so serialization isn't reading a map that's still being mutated concurrently.
+    private fun snapshot(): Map<String, Map<String, DailyStatEntry>> =
+        cache.mapValues { it.value.toMap() }
 
     private fun loadCacheFromFile(): ConcurrentHashMap<String, ConcurrentHashMap<String, DailyStatEntry>> {
         val deserialized = loadFromFile<DailyStatsCacheFile>()
