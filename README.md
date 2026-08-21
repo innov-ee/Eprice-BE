@@ -6,10 +6,11 @@
 ### Running locally
 - start (with changes): docker-compose up --build
 - stop: Ctrl + C
+> Alternatively in IntelliJ IDEA you can use `Run Server.run.xml` gradle config to run it directly on local JVM.
 
 ### Verify
 - unit tests: `./gradlew test`
-- prices: http://localhost:8080/api/prices
+- prices (EE): http://localhost:8080/api/prices
 - status: http://localhost:8080/monitor
 - price stats: http://localhost:8080/api/prices/EE/stats 
 - yesterday stats: http://localhost:8080/api/prices/EE/stats?range=yesterday
