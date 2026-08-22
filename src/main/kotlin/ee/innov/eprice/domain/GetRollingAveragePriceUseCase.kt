@@ -6,13 +6,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
-import java.time.Instant
+import java.time.Clock
 import java.time.LocalDate
-import java.time.ZoneOffset
 
 class GetRollingAveragePriceUseCase(
     private val energyPriceRepository: EnergyPriceRepository,
-    private val dailyAveragePriceCache: DailyAveragePriceCache
+    private val dailyAveragePriceCache: DailyAveragePriceCache,
+    private val clock: Clock = Clock.systemUTC()
 ) {
 
     /**
@@ -31,8 +31,9 @@ class GetRollingAveragePriceUseCase(
             return Result.failure(IllegalArgumentException("Number of days must be positive."))
         }
 
-        // We calculate up to *yesterday*. Today's data is often incomplete.
-        val endDate = Instant.now().atZone(ZoneOffset.UTC).toLocalDate().minusDays(1)
+        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val today = LocalDate.now(clock.withZone(zoneId))
+        val endDate = today.minusDays(1)
         val startDate = endDate.minusDays(days.toLong() - 1)
 
         // 1. Get all dates in the range
@@ -54,9 +55,9 @@ class GetRollingAveragePriceUseCase(
                     val deferredResults = missingDates.map { date ->
                         async {
                             // Fetch data for a single day
-                            val dayStart = date.atStartOfDay(ZoneOffset.UTC).toInstant()
+                            val dayStart = date.atStartOfDay(zoneId).toInstant()
                             val dayEnd =
-                                date.plusDays(1).atStartOfDay(ZoneOffset.UTC).minusSeconds(1)
+                                date.plusDays(1).atStartOfDay(zoneId).minusSeconds(1)
                                     .toInstant()
 
 

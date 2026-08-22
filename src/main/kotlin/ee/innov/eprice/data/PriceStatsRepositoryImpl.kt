@@ -1,5 +1,6 @@
 package ee.innov.eprice.data
 
+import ee.innov.eprice.domain.CountryZoneProvider
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.domain.model.DailyStatEntry
@@ -7,7 +8,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import java.time.LocalDate
-import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
 class PriceStatsRepositoryImpl(
@@ -49,8 +49,9 @@ class PriceStatsRepositoryImpl(
     }
 
     private suspend fun fetchDailyStat(countryCode: String, date: LocalDate): Pair<LocalDate, DailyStatEntry>? {
-        val dayStart = date.atStartOfDay(ZoneOffset.UTC).toInstant()
-        val dayEnd = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).minusSeconds(1).toInstant()
+        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val dayStart = date.atStartOfDay(zoneId).toInstant()
+        val dayEnd = date.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
 
         val prices = energyPriceRepository.getPrices(
             countryCode = countryCode,
