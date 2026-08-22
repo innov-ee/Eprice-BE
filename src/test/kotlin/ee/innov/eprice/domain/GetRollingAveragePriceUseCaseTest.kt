@@ -1,39 +1,14 @@
 package ee.innov.eprice.domain
 
-import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.domain.model.DomainEnergyPrice
+import ee.innov.eprice.test.NoOpDailyAveragePriceCache
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneOffset
-
-private class InMemoryDailyAveragePriceCacheFake : DailyAveragePriceCache {
-    val store = mutableMapOf<String, MutableMap<LocalDate, Double>>()
-
-    override fun get(countryCode: String, date: LocalDate): Double? =
-        store[countryCode.uppercase()]?.get(date)
-
-    override fun put(countryCode: String, date: LocalDate, averagePrice: Double) {
-        store.getOrPut(countryCode.uppercase()) { mutableMapOf() }[date] = averagePrice
-    }
-
-    override fun getRange(
-        countryCode: String,
-        startDate: LocalDate,
-        endDate: LocalDate
-    ): Map<LocalDate, Double> {
-        val countryMap = store[countryCode.uppercase()] ?: return emptyMap()
-        return countryMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
-    }
-
-    override fun clear() {
-        store.clear()
-    }
-}
 
 private class RollingEnergyPriceRepoSpy : EnergyPriceRepository {
     val requestedRanges = mutableListOf<Pair<Instant, Instant>>()
@@ -59,7 +34,7 @@ class GetRollingAveragePriceUseCaseTest {
 
     @Test
     fun `execute uses country local timezone for end date and fetch boundaries`() = runBlocking {
-        val cache = InMemoryDailyAveragePriceCacheFake()
+        val cache = NoOpDailyAveragePriceCache()
         val repoSpy = RollingEnergyPriceRepoSpy()
 
         // At 2026-08-22 10:00 UTC (Estonia UTC+3), today is 2026-08-22
