@@ -221,6 +221,45 @@ class ApplicationTest {
     }
 
     @Test
+    fun `GET prices stats for today should return 200 OK with statistics`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/api/prices/EE/stats?range=today")
+
+                assertEquals(HttpStatusCode.OK, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""countryCode":"EE""""))
+                assertTrue(body.contains(""""daysCalculated":1"""))
+            }
+        )
+    }
+
+    @Test
+    fun `GET prices stats for tomorrow before publication should return 404 NotFound`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringNoDataJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = mockEntsoeNoDataErrorXml,
+                entsoeStatus = HttpStatusCode.OK
+            ),
+            testBlock = {
+                val response = client.get("/api/prices/EE/stats?range=tomorrow")
+
+                assertEquals(HttpStatusCode.NotFound, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""error":"No data found""""))
+            }
+        )
+    }
+
+    @Test
     fun `GET prices stats with invalid days should return 400 BadRequest`() {
         runPriceApiTest(
             engineHandler = createMockEngineHandler(
@@ -231,6 +270,23 @@ class ApplicationTest {
             ),
             testBlock = {
                 val response = client.get("/api/prices/EE/stats?days=-5")
+
+                assertEquals(HttpStatusCode.BadRequest, response.status)
+            }
+        )
+    }
+
+    @Test
+    fun `GET prices stats with invalid range name should return 400 BadRequest`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/api/prices/EE/stats?range=nextmonth")
 
                 assertEquals(HttpStatusCode.BadRequest, response.status)
             }

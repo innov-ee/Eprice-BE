@@ -1,14 +1,16 @@
 package ee.innov.eprice.domain
 
 import ee.innov.eprice.domain.model.NoDataFoundException
+import ee.innov.eprice.domain.model.PriceStatsQuery
+import ee.innov.eprice.domain.model.PriceStatsQuery.NamedRange
 import kotlinx.serialization.Serializable
-import java.time.Instant
+import java.time.Clock
 import java.time.LocalDate
-import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
 class GetPriceStatisticsUseCase(
-    private val priceStatsRepository: PriceStatsRepository
+    private val priceStatsRepository: PriceStatsRepository,
+    private val clock: Clock = Clock.systemUTC()
 ) {
 
     companion object {
@@ -29,44 +31,61 @@ class GetPriceStatisticsUseCase(
     )
 
     /**
-     * Calculates price statistics for a rolling window of days ending yesterday.
-     * Defaults to 5 days for fast testing and API rate management.
-     */
-    suspend fun execute(countryCode: String, days: Int = 5): Result<PriceStatistics> {
-        if (days <= 0) {
-            return Result.failure(IllegalArgumentException("Number of days must be positive."))
-        }
-        val endDate = Instant.now().atZone(ZoneOffset.UTC).toLocalDate().minusDays(1)
-        val startDate = endDate.minusDays(days.toLong() - 1)
-        return execute(countryCode, startDate, endDate, daysRequested = days)
-    }
-
-    /**
-     * Calculates price statistics specifically for yesterday.
-     */
-    suspend fun executeYesterday(countryCode: String): Result<PriceStatistics> {
-        val yesterday = Instant.now().atZone(ZoneOffset.UTC).toLocalDate().minusDays(1)
-        return execute(countryCode, yesterday, yesterday, daysRequested = 1)
-    }
-
-    /**
-     * Calculates price statistics for an explicit date range.
+     * Executes price statistics calculation based on domain [PriceStatsQuery].
      */
     suspend fun execute(
         countryCode: String,
-        startDate: LocalDate,
-        endDate: LocalDate,
-        daysRequested: Int = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
+        query: PriceStatsQuery = PriceStatsQuery.Default
     ): Result<PriceStatistics> {
-        if (startDate.isAfter(endDate)) {
-            return Result.failure(IllegalArgumentException("startDate cannot be after endDate."))
-        }
+        val today = LocalDate.now(clock)
 
-        val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
-        if (totalDays > MAX_RANGE_DAYS) {
-            return Result.failure(
-                IllegalArgumentException("Date range too large ($totalDays days); max is $MAX_RANGE_DAYS days.")
-            )
+        val (startDate, endDate, daysRequested) = when (query) {
+            is PriceStatsQuery.Named -> when (query.range) {
+                NamedRange.YESTERDAY -> {
+                    val yesterday = today.minusDays(1)
+                    Triple(yesterday, yesterday, 1)
+                }
+                NamedRange.TODAY -> {
+                    Triple(today, today, 1)
+                }
+                NamedRange.TOMORROW -> {
+                    val tomorrow = today.plusDays(1)
+                    Triple(tomorrow, tomorrow, 1)
+                }
+            }
+
+            is PriceStatsQuery.Days -> {
+                if (query.days <= 0) {
+                    return Result.failure(IllegalArgumentException("Number of days must be positive."))
+                }
+                if (query.days > MAX_RANGE_DAYS) {
+                    return Result.failure(
+                        IllegalArgumentException("Number of days too large (${query.days}); max is $MAX_RANGE_DAYS days.")
+                    )
+                }
+                val end = today.minusDays(1)
+                val start = end.minusDays(query.days.toLong() - 1)
+                Triple(start, end, query.days)
+            }
+
+            is PriceStatsQuery.CustomRange -> {
+                if (query.startDate.isAfter(query.endDate)) {
+                    return Result.failure(IllegalArgumentException("startDate cannot be after endDate."))
+                }
+                val totalDays = (ChronoUnit.DAYS.between(query.startDate, query.endDate) + 1).toInt()
+                if (totalDays > MAX_RANGE_DAYS) {
+                    return Result.failure(
+                        IllegalArgumentException("Date range too large ($totalDays days); max is $MAX_RANGE_DAYS days.")
+                    )
+                }
+                Triple(query.startDate, query.endDate, totalDays)
+            }
+
+            is PriceStatsQuery.Default -> {
+                val end = today.minusDays(1)
+                val start = end.minusDays(4)
+                Triple(start, end, 5)
+            }
         }
 
         val dailyStatsResult = priceStatsRepository.getDailyStats(countryCode, startDate, endDate)
@@ -97,4 +116,16 @@ class GetPriceStatisticsUseCase(
             )
         )
     }
+
+    /**
+     * Convenience method to calculate price statistics for rolling window of days.
+     */
+    suspend fun execute(countryCode: String, days: Int): Result<PriceStatistics> =
+        execute(countryCode, PriceStatsQuery.Days(days))
+
+    /**
+     * Convenience method to calculate price statistics for explicit date range.
+     */
+    suspend fun execute(countryCode: String, startDate: LocalDate, endDate: LocalDate): Result<PriceStatistics> =
+        execute(countryCode, PriceStatsQuery.CustomRange(startDate, endDate))
 }

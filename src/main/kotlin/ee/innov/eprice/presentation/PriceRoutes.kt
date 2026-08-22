@@ -8,19 +8,24 @@ import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.NoDataFoundException
+import ee.innov.eprice.domain.model.PriceStatsQuery
+import ee.innov.eprice.domain.model.PriceStatsQuery.NamedRange
 import ee.innov.eprice.monitoring.ServiceMonitor
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.application.log
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import kotlinx.serialization.Serializable
 import org.koin.ktor.ext.inject
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 
-@kotlinx.serialization.Serializable
+@Serializable
 data class ErrorResponse(val error: String, val details: String? = null)
 
 fun Route.priceRoutes() {
@@ -98,42 +103,19 @@ fun Route.priceRoutes() {
 
     get("/api/prices/{countryCode}/stats") {
         val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
-        val rangeParam = call.request.queryParameters["range"]?.lowercase()
-        val daysParam = call.request.queryParameters["days"]
-        val startDateParam = call.request.queryParameters["startDate"]
-        val endDateParam = call.request.queryParameters["endDate"]
 
-        val result = try {
-            when {
-                rangeParam == "yesterday" -> {
-                    getPriceStatisticsUseCase.executeYesterday(countryCode)
-                }
-                startDateParam != null && endDateParam != null -> {
-                    val start = LocalDate.parse(startDateParam)
-                    val end = LocalDate.parse(endDateParam)
-                    getPriceStatisticsUseCase.execute(countryCode, start, end)
-                }
-                daysParam != null -> {
-                    val days = daysParam.toIntOrNull()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            ErrorResponse("Invalid 'days' parameter", "Must be a positive integer.")
-                        )
-                    getPriceStatisticsUseCase.execute(countryCode, days)
-                }
-                else -> {
-                    // Default to 5 days for initial testing / rollout
-                    getPriceStatisticsUseCase.execute(countryCode, 5)
-                }
-            }
-        } catch (e: DateTimeParseException) {
+        val query = try {
+            parsePriceStatsQuery(call.request.queryParameters)
+        } catch (e: IllegalArgumentException) {
             return@get call.respond(
                 HttpStatusCode.BadRequest,
-                ErrorResponse("Invalid date format", "Dates must be in ISO-8601 YYYY-MM-DD format.")
+                ErrorResponse("Invalid query parameters", e.message)
             )
         }
 
-        result.onSuccess { stats ->
+        val result = getPriceStatisticsUseCase.execute(countryCode, query)
+
+        result.onSuccess { stats: GetPriceStatisticsUseCase.PriceStatistics ->
             call.respond(HttpStatusCode.OK, stats)
         }.onFailure { error ->
             call.application.log.error("Error fetching price stats for $countryCode", error)
@@ -142,11 +124,44 @@ fun Route.priceRoutes() {
     }
 }
 
+private fun parsePriceStatsQuery(params: Parameters): PriceStatsQuery {
+    val rangeParam = params["range"]?.lowercase()
+    val daysParam = params["days"]
+    val startDateParam = params["startDate"]
+    val endDateParam = params["endDate"]
+
+    return when {
+        rangeParam != null -> {
+            val named = NamedRange.fromStringOrNull(rangeParam)
+                ?: throw IllegalArgumentException("Invalid 'range' parameter: '$rangeParam'. Must be 'yesterday', 'today', or 'tomorrow'.")
+            PriceStatsQuery.Named(named)
+        }
+        startDateParam != null || endDateParam != null -> {
+            if (startDateParam == null || endDateParam == null) {
+                throw IllegalArgumentException("Both 'startDate' and 'endDate' parameters must be provided.")
+            }
+            try {
+                val start = LocalDate.parse(startDateParam)
+                val end = LocalDate.parse(endDateParam)
+                PriceStatsQuery.CustomRange(start, end)
+            } catch (e: DateTimeParseException) {
+                throw IllegalArgumentException("Dates must be in ISO-8601 YYYY-MM-DD format.")
+            }
+        }
+        daysParam != null -> {
+            val days = daysParam.toIntOrNull()
+                ?: throw IllegalArgumentException("Invalid 'days' parameter. Must be a positive integer.")
+            PriceStatsQuery.Days(days)
+        }
+        else -> PriceStatsQuery.Default
+    }
+}
+
 /**
  * Helper function to map domain errors to HTTP responses.
  */
 private suspend fun respondWithError(
-    call: io.ktor.server.application.ApplicationCall,
+    call: ApplicationCall,
     error: Throwable
 ) {
     call.application.log.error("API Error", error) // Log all errors
