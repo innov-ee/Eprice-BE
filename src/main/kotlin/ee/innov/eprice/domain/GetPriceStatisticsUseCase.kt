@@ -37,7 +37,8 @@ class GetPriceStatisticsUseCase(
         countryCode: String,
         query: PriceStatsQuery = PriceStatsQuery.Default
     ): Result<PriceStatistics> {
-        val today = LocalDate.now(clock)
+        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val today = LocalDate.now(clock.withZone(zoneId))
 
         val (startDate, endDate, daysRequested) = when (query) {
             is PriceStatsQuery.Named -> when (query.range) {

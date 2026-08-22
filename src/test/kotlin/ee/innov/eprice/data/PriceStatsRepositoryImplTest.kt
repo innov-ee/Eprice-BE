@@ -40,6 +40,7 @@ private class InMemoryDailyStatsCacheFake : DailyStatsCache {
 
 private class CountingPriceRepositoryFake : EnergyPriceRepository {
     var callCount = 0
+    val requestedRanges = mutableListOf<Pair<Instant, Instant>>()
 
     override suspend fun getPrices(
         countryCode: String,
@@ -48,6 +49,7 @@ private class CountingPriceRepositoryFake : EnergyPriceRepository {
         cacheResults: Boolean
     ): Result<List<DomainEnergyPrice>> {
         callCount++
+        requestedRanges.add(start to end)
         val prices = (0 until 24).map { hour ->
             DomainEnergyPrice(
                 startTime = start.plusSeconds(hour * 3600L),
@@ -106,5 +108,30 @@ class PriceStatsRepositoryImplTest {
         // Fetched only day 1 and day 3 -> 2 calls
         assertEquals(2, priceRepo.callCount)
         assertEquals(0.05, map[day2]?.min)
+    }
+
+    @Test
+    fun `fetchDailyStat uses country local timezone boundaries during summer and winter`() = runBlocking {
+        val cache = InMemoryDailyStatsCacheFake()
+        val priceRepo = CountingPriceRepositoryFake()
+        val statsRepo = PriceStatsRepositoryImpl(priceRepo, cache)
+
+        // Summer date in Estonia (EEST is UTC+3): 2026-08-22 start is 2026-08-21T21:00:00Z
+        val summerDate = LocalDate.of(2026, 8, 22)
+        statsRepo.getDailyStats("EE", summerDate, summerDate)
+
+        assertEquals(1, priceRepo.requestedRanges.size)
+        val (summerStart, summerEnd) = priceRepo.requestedRanges[0]
+        assertEquals(Instant.parse("2026-08-21T21:00:00Z"), summerStart)
+        assertEquals(Instant.parse("2026-08-22T20:59:59Z"), summerEnd)
+
+        // Winter date in Estonia (EET is UTC+2): 2026-01-15 start is 2026-01-14T22:00:00Z
+        val winterDate = LocalDate.of(2026, 1, 15)
+        statsRepo.getDailyStats("EE", winterDate, winterDate)
+
+        assertEquals(2, priceRepo.requestedRanges.size)
+        val (winterStart, winterEnd) = priceRepo.requestedRanges[1]
+        assertEquals(Instant.parse("2026-01-14T22:00:00Z"), winterStart)
+        assertEquals(Instant.parse("2026-01-15T21:59:59Z"), winterEnd)
     }
 }

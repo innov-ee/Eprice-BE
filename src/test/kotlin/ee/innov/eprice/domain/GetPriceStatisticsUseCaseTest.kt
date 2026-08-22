@@ -194,4 +194,19 @@ class GetPriceStatisticsUseCaseTest {
         // Guards against fan-out of 1000 concurrent upstream fetches (repository was never called)
         assertEquals(0, repo.callCount)
     }
+
+    @Test
+    fun `execute named today uses country local timezone to determine current date`() = runBlocking {
+        // 22:30 UTC on 2026-08-22 is 01:30 on 2026-08-23 in Estonia (UTC+3)
+        val lateUtcInstant = Instant.parse("2026-08-22T22:30:00Z")
+        val lateClock = Clock.fixed(lateUtcInstant, ZoneOffset.UTC)
+        val tzUseCase = GetPriceStatisticsUseCase(repo, lateClock)
+
+        val result = tzUseCase.execute("EE", PriceStatsQuery.Named(NamedRange.TODAY))
+        assertTrue(result.isSuccess)
+
+        val stats = result.getOrThrow()
+        assertEquals("2026-08-23", stats.startDate)
+        assertEquals("2026-08-23", stats.endDate)
+    }
 }

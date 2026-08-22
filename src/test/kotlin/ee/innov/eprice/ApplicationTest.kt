@@ -1,8 +1,11 @@
 // file: kotlin/ee/innov/eprice/ApplicationTest.kt
 package ee.innov.eprice
 
+import ee.innov.eprice.data.DailyAveragePriceCache
+import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache // Import PriceCache
 import ee.innov.eprice.di.appModule
+import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.DomainEnergyPrice // Import DomainEnergyPrice
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -25,6 +28,8 @@ import org.junit.jupiter.api.Test
 import org.koin.core.context.GlobalContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import java.time.LocalDate
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -39,6 +44,59 @@ private class NoOpPriceCache : PriceCache {
     }
 
     override fun clear() { /* Do nothing */
+    }
+}
+
+private class InMemoryDailyStatsCache : DailyStatsCache {
+    private val store = ConcurrentHashMap<String, ConcurrentHashMap<LocalDate, DailyStatEntry>>()
+
+    override fun get(countryCode: String, date: LocalDate): DailyStatEntry? =
+        store[countryCode.uppercase()]?.get(date)
+
+    override fun put(countryCode: String, date: LocalDate, stats: DailyStatEntry) {
+        store.getOrPut(countryCode.uppercase()) { ConcurrentHashMap() }[date] = stats
+    }
+
+    override fun putBatch(countryCode: String, entries: Map<LocalDate, DailyStatEntry>) {
+        val countryMap = store.getOrPut(countryCode.uppercase()) { ConcurrentHashMap() }
+        countryMap.putAll(entries)
+    }
+
+    override fun getRange(
+        countryCode: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Map<LocalDate, DailyStatEntry> {
+        val countryMap = store[countryCode.uppercase()] ?: return emptyMap()
+        return countryMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
+    }
+
+    override fun clear() {
+        store.clear()
+    }
+}
+
+private class InMemoryDailyAveragePriceCache : DailyAveragePriceCache {
+    private val store = ConcurrentHashMap<String, ConcurrentHashMap<LocalDate, Double>>()
+
+    override fun get(countryCode: String, date: LocalDate): Double? =
+        store[countryCode.uppercase()]?.get(date)
+
+    override fun put(countryCode: String, date: LocalDate, averagePrice: Double) {
+        store.getOrPut(countryCode.uppercase()) { ConcurrentHashMap() }[date] = averagePrice
+    }
+
+    override fun getRange(
+        countryCode: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Map<LocalDate, Double> {
+        val countryMap = store[countryCode.uppercase()] ?: return emptyMap()
+        return countryMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
+    }
+
+    override fun clear() {
+        store.clear()
     }
 }
 
@@ -355,6 +413,8 @@ class ApplicationTest {
             single { mockHttpClient } // Override the real HttpClient
             single(qualifier = named("entsoeApiKey")) { "TEST_KEY" }
             single<PriceCache> { NoOpPriceCache() }
+            single<DailyStatsCache> { InMemoryDailyStatsCache() }
+            single<DailyAveragePriceCache> { InMemoryDailyAveragePriceCache() }
         }
 
         application {
