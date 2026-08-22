@@ -10,12 +10,14 @@ import ee.innov.eprice.data.FileBackedDailyAveragePriceCache
 import ee.innov.eprice.data.FileBackedDailyStatsCache
 import ee.innov.eprice.data.InMemoryPriceCache
 import ee.innov.eprice.data.PriceCache
+import ee.innov.eprice.data.PriceStatsRepositoryImpl
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
+import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -108,7 +110,13 @@ val appModule = module {
         EnergyPriceRepositoryImpl(
             entsoeService = get(),
             eleringService = get(),
-            cache = get(),
+            cache = get()
+        )
+    }
+
+    single<PriceStatsRepository> {
+        PriceStatsRepositoryImpl(
+            energyPriceRepository = get(),
             dailyStatsCache = get()
         )
     }
@@ -124,7 +132,7 @@ val appModule = module {
 
     factory {
         GetPriceStatisticsUseCase(
-            energyPriceRepository = get()
+            priceStatsRepository = get()
         )
     }
 }

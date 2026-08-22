@@ -8,7 +8,7 @@ import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
 class GetPriceStatisticsUseCase(
-    private val energyPriceRepository: EnergyPriceRepository
+    private val priceStatsRepository: PriceStatsRepository
 ) {
 
     companion object {
@@ -69,7 +69,7 @@ class GetPriceStatisticsUseCase(
             )
         }
 
-        val dailyStatsResult = energyPriceRepository.getDailyStats(countryCode, startDate, endDate)
+        val dailyStatsResult = priceStatsRepository.getDailyStats(countryCode, startDate, endDate)
         val allStats = dailyStatsResult.getOrElse { return Result.failure(it) }.values
 
         if (allStats.isEmpty()) {
