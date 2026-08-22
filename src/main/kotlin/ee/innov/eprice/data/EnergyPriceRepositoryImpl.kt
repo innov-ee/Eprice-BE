@@ -53,7 +53,6 @@ class EnergyPriceRepositoryImpl(
         start: Instant,
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
-
         // Strategy: Try Elering first.
         try {
             val eleringMarketDocument = eleringService.fetchPrices(countryCode, start, end)
