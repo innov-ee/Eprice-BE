@@ -1,8 +1,10 @@
 package ee.innov.eprice.presentation
 
 import ee.innov.eprice.data.DailyAveragePriceCache
+import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
+import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.NoDataFoundException
@@ -15,16 +17,20 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import org.koin.ktor.ext.inject
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 @kotlinx.serialization.Serializable
 data class ErrorResponse(val error: String, val details: String? = null)
 
 fun Route.priceRoutes() {
-    // Inject the use case directly into the route
+    // Inject the use cases directly into the route
     val getEnergyPricesUseCase: GetEnergyPricesUseCase by inject()
     val getRollingAveragePriceUseCase: GetRollingAveragePriceUseCase by inject()
+    val getPriceStatisticsUseCase: GetPriceStatisticsUseCase by inject()
     val priceCache: PriceCache by inject()
     val dailyAveragePriceCache: DailyAveragePriceCache by inject()
+    val dailyStatsCache: DailyStatsCache by inject()
     val monitor: ServiceMonitor by inject()
 
     // Interceptor to count all incoming requests
@@ -49,6 +55,7 @@ fun Route.priceRoutes() {
         try {
             priceCache.clear()
             dailyAveragePriceCache.clear()
+            dailyStatsCache.clear()
             call.application.log.info("Cache clear requested and initiated for all caches.")
             call.respond(HttpStatusCode.OK, mapOf("status" to "All caches clear initiated"))
         } catch (e: Exception) {
@@ -78,13 +85,58 @@ fun Route.priceRoutes() {
 
     get("/api/prices/{countryCode}/avg") {
         val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
-        val days = 30
+        val days = 5
         val result = getRollingAveragePriceUseCase.execute(countryCode, days)
 
         result.onSuccess { rollingAverage ->
             call.respond(HttpStatusCode.OK, rollingAverage)
         }.onFailure { error ->
             call.application.log.error("Error fetching rolling average for $countryCode", error)
+            respondWithError(call, error)
+        }
+    }
+
+    get("/api/prices/{countryCode}/stats") {
+        val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
+        val rangeParam = call.request.queryParameters["range"]?.lowercase()
+        val daysParam = call.request.queryParameters["days"]
+        val startDateParam = call.request.queryParameters["startDate"]
+        val endDateParam = call.request.queryParameters["endDate"]
+
+        val result = try {
+            when {
+                rangeParam == "yesterday" -> {
+                    getPriceStatisticsUseCase.executeYesterday(countryCode)
+                }
+                startDateParam != null && endDateParam != null -> {
+                    val start = LocalDate.parse(startDateParam)
+                    val end = LocalDate.parse(endDateParam)
+                    getPriceStatisticsUseCase.execute(countryCode, start, end)
+                }
+                daysParam != null -> {
+                    val days = daysParam.toIntOrNull()
+                        ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            ErrorResponse("Invalid 'days' parameter", "Must be a positive integer.")
+                        )
+                    getPriceStatisticsUseCase.execute(countryCode, days)
+                }
+                else -> {
+                    // Default to 5 days for initial testing / rollout
+                    getPriceStatisticsUseCase.execute(countryCode, 5)
+                }
+            }
+        } catch (e: DateTimeParseException) {
+            return@get call.respond(
+                HttpStatusCode.BadRequest,
+                ErrorResponse("Invalid date format", "Dates must be in ISO-8601 YYYY-MM-DD format.")
+            )
+        }
+
+        result.onSuccess { stats ->
+            call.respond(HttpStatusCode.OK, stats)
+        }.onFailure { error ->
+            call.application.log.error("Error fetching price stats for $countryCode", error)
             respondWithError(call, error)
         }
     }
