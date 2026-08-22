@@ -7,15 +7,23 @@ import ee.innov.eprice.data.entsoe.toBiddingZone
 import ee.innov.eprice.data.entsoe.toDomainEnergyPrices
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.ApiError
+import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.toApiError
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
 class EnergyPriceRepositoryImpl(
     private val entsoeService: EntsoeService,
     private val eleringService: EleringService,
-    private val cache: PriceCache
+    private val cache: PriceCache,
+    private val dailyStatsCache: DailyStatsCache
 ) : EnergyPriceRepository {
 
     override suspend fun getPrices(
@@ -45,6 +53,61 @@ class EnergyPriceRepositoryImpl(
         return networkResult
     }
 
+    override suspend fun getDailyStats(
+        countryCode: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Result<Map<LocalDate, DailyStatEntry>> {
+        val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
+        val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
+
+        val cachedStats = dailyStatsCache.getRange(countryCode, startDate, endDate)
+        val missingDates = datesInRange.filter { !cachedStats.containsKey(it) }
+
+        if (missingDates.isEmpty()) {
+            return Result.success(cachedStats)
+        }
+
+        val fetchedStats = try {
+            coroutineScope {
+                val deferredResults = missingDates.map { date ->
+                    async { fetchDailyStat(countryCode, date) }
+                }
+                deferredResults.awaitAll().filterNotNull().toMap()
+            }
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        if (fetchedStats.isNotEmpty()) {
+            dailyStatsCache.putBatch(countryCode, fetchedStats)
+        }
+
+        return Result.success(cachedStats + fetchedStats)
+    }
+
+    private suspend fun fetchDailyStat(countryCode: String, date: LocalDate): Pair<LocalDate, DailyStatEntry>? {
+        val dayStart = date.atStartOfDay(ZoneOffset.UTC).toInstant()
+        val dayEnd = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).minusSeconds(1).toInstant()
+
+        val prices = getPrices(
+            countryCode = countryCode,
+            start = dayStart,
+            end = dayEnd,
+            cacheResults = false
+        ).getOrNull()?.takeIf { it.isNotEmpty() } ?: return null
+
+        val pricesList = prices.map { it.pricePerKWh }
+        val entry = DailyStatEntry(
+            min = pricesList.min(),
+            max = pricesList.max(),
+            avg = pricesList.average(),
+            sum = pricesList.sum(),
+            count = pricesList.size
+        )
+        return date to entry
+    }
+
     /**
      * Contains the original network-fetching logic.
      */
@@ -53,6 +116,7 @@ class EnergyPriceRepositoryImpl(
         start: Instant,
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
+
         // Strategy: Try Elering first.
         try {
             val eleringMarketDocument = eleringService.fetchPrices(countryCode, start, end)

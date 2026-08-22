@@ -1,5 +1,6 @@
 package ee.innov.eprice.data
 
+import ee.innov.eprice.domain.model.DailyStatEntry
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull

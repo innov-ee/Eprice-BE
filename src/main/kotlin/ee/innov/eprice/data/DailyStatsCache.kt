@@ -1,20 +1,12 @@
 package ee.innov.eprice.data
 
+import ee.innov.eprice.domain.model.DailyStatEntry
 import kotlinx.serialization.Serializable
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
-
-@Serializable
-data class DailyStatEntry(
-    val min: Double,
-    val max: Double,
-    val avg: Double,
-    val sum: Double,
-    val count: Int
-)
 
 interface DailyStatsCache {
 

@@ -1,7 +1,6 @@
 package ee.innov.eprice.domain
 
-import ee.innov.eprice.data.DailyStatEntry
-import ee.innov.eprice.data.DailyStatsCache
+import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -11,38 +10,15 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
-private class InMemoryDailyStatsCache : DailyStatsCache {
-    private val data = mutableMapOf<String, MutableMap<LocalDate, DailyStatEntry>>()
-
-    override fun get(countryCode: String, date: LocalDate): DailyStatEntry? {
-        return data[countryCode.uppercase()]?.get(date)
-    }
-
-    override fun put(countryCode: String, date: LocalDate, stats: DailyStatEntry) {
-        data.getOrPut(countryCode.uppercase()) { mutableMapOf() }[date] = stats
-    }
-
-    override fun putBatch(countryCode: String, entries: Map<LocalDate, DailyStatEntry>) {
-        data.getOrPut(countryCode.uppercase()) { mutableMapOf() }.putAll(entries)
-    }
-
-    override fun getRange(
-        countryCode: String,
-        startDate: LocalDate,
-        endDate: LocalDate
-    ): Map<LocalDate, DailyStatEntry> {
-        val countryData = data[countryCode.uppercase()] ?: return emptyMap()
-        return countryData.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
-    }
-
-    override fun clear() {
-        data.clear()
-    }
-}
-
+/**
+ * Fakes the repository's whole contract, including its internal daily-stats caching,
+ * so tests can assert on cache hits without the use case knowing about caching at all.
+ */
 private class FakeEnergyPriceRepository : EnergyPriceRepository {
     var callCount = 0
+    private val dailyStatsByCountry = mutableMapOf<String, MutableMap<LocalDate, DailyStatEntry>>()
     val priceProvider: (countryCode: String, start: Instant, end: Instant) -> List<DomainEnergyPrice> = { _, start, _ ->
         // Generate 24 hourly prices
         (0 until 24).map { hour ->
@@ -63,19 +39,43 @@ private class FakeEnergyPriceRepository : EnergyPriceRepository {
         val prices = priceProvider(countryCode, start, end)
         return Result.success(prices)
     }
+
+    override suspend fun getDailyStats(
+        countryCode: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Result<Map<LocalDate, DailyStatEntry>> {
+        val countryCache = dailyStatsByCountry.getOrPut(countryCode.uppercase()) { mutableMapOf() }
+        val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
+        val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
+
+        datesInRange.filter { !countryCache.containsKey(it) }.forEach { date ->
+            val dayStart = date.atStartOfDay(ZoneOffset.UTC).toInstant()
+            val dayEnd = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).minusSeconds(1).toInstant()
+            val prices = getPrices(countryCode, dayStart, dayEnd, cacheResults = false).getOrThrow()
+            val pricesList = prices.map { it.pricePerKWh }
+            countryCache[date] = DailyStatEntry(
+                min = pricesList.min(),
+                max = pricesList.max(),
+                avg = pricesList.average(),
+                sum = pricesList.sum(),
+                count = pricesList.size
+            )
+        }
+
+        return Result.success(datesInRange.associateWith { countryCache.getValue(it) })
+    }
 }
 
 class GetPriceStatisticsUseCaseTest {
 
-    private lateinit var cache: InMemoryDailyStatsCache
     private lateinit var repo: FakeEnergyPriceRepository
     private lateinit var useCase: GetPriceStatisticsUseCase
 
     @BeforeEach
     fun setUp() {
-        cache = InMemoryDailyStatsCache()
         repo = FakeEnergyPriceRepository()
-        useCase = GetPriceStatisticsUseCase(repo, cache)
+        useCase = GetPriceStatisticsUseCase(repo)
     }
 
     @Test
@@ -91,16 +91,16 @@ class GetPriceStatisticsUseCaseTest {
         assertEquals(0.33, stats.maxPrice, 0.0001)
         assertEquals(0.215, stats.averagePrice, 0.0001)
 
-        // Verify it was stored in cache
+        // Verify the repository cached it internally
         val yesterday = Instant.now().atZone(ZoneOffset.UTC).toLocalDate().minusDays(1)
-        val cached = cache.get("EE", yesterday)
+        val cached = repo.getDailyStats("EE", yesterday, yesterday).getOrThrow()[yesterday]
         assertEquals(0.10, cached?.min)
         assertEquals(0.33, cached?.max)
     }
 
     @Test
-    fun `execute with 5 days uses cache on subsequent calls without repo fetch`() = runBlocking {
-        // Cold start - repo called 5 times
+    fun `execute with 5 days uses repository cache on subsequent calls without extra network fetch`() = runBlocking {
+        // Cold start - repo fetches 5 times
         val firstResult = useCase.execute("EE", days = 5)
         assertTrue(firstResult.isSuccess)
         assertEquals(5, repo.callCount)

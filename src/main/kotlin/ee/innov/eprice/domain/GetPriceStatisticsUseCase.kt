@@ -1,11 +1,6 @@
 package ee.innov.eprice.domain
 
-import ee.innov.eprice.data.DailyStatEntry
-import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.domain.model.NoDataFoundException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.LocalDate
@@ -13,12 +8,11 @@ import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
 class GetPriceStatisticsUseCase(
-    private val energyPriceRepository: EnergyPriceRepository,
-    private val dailyStatsCache: DailyStatsCache
+    private val energyPriceRepository: EnergyPriceRepository
 ) {
 
     companion object {
-        // Bounds the one-coroutine-per-missing-day fan-out below on oversized range requests.
+        // Bounds the size of the date range delegated to the repository per request.
         private const val MAX_RANGE_DAYS = 60
     }
 
@@ -74,70 +68,9 @@ class GetPriceStatisticsUseCase(
                 IllegalArgumentException("Date range too large ($totalDays days); max is $MAX_RANGE_DAYS days.")
             )
         }
-        val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
 
-        // 1. Get cached daily stats for this range
-        val cachedStats: Map<LocalDate, DailyStatEntry> =
-            dailyStatsCache.getRange(countryCode, startDate, endDate)
-
-        // 2. Identify missing dates
-        val missingDates = datesInRange.filter { !cachedStats.containsKey(it) }
-
-        val fetchedStats = mutableMapOf<LocalDate, DailyStatEntry>()
-
-        if (missingDates.isNotEmpty()) {
-            try {
-                coroutineScope {
-                    val deferredResults = missingDates.map { date ->
-                        async {
-                            val dayStart = date.atStartOfDay(ZoneOffset.UTC).toInstant()
-                            val dayEnd =
-                                date.plusDays(1).atStartOfDay(ZoneOffset.UTC).minusSeconds(1)
-                                    .toInstant()
-
-                            val result = energyPriceRepository.getPrices(
-                                countryCode = countryCode,
-                                start = dayStart,
-                                end = dayEnd,
-                                cacheResults = false
-                            )
-
-                            result.getOrNull()?.let { prices ->
-                                if (prices.isNotEmpty()) {
-                                    val pricesList = prices.map { it.pricePerKWh }
-                                    val min = pricesList.minOrNull() ?: 0.0
-                                    val max = pricesList.maxOrNull() ?: 0.0
-                                    val sum = pricesList.sum()
-                                    val count = pricesList.size
-                                    val avg = if (count > 0) sum / count else 0.0
-
-                                    val entry = DailyStatEntry(
-                                        min = min,
-                                        max = max,
-                                        avg = avg,
-                                        sum = sum,
-                                        count = count
-                                    )
-                                    date to entry
-                                } else {
-                                    null
-                                }
-                            }
-                        }
-                    }
-                    fetchedStats.putAll(deferredResults.awaitAll().filterNotNull())
-                }
-
-                // Persist missing entries in a single batch write
-                if (fetchedStats.isNotEmpty()) {
-                    dailyStatsCache.putBatch(countryCode, fetchedStats)
-                }
-            } catch (e: Exception) {
-                return Result.failure(e)
-            }
-        }
-
-        val allStats = (cachedStats.values + fetchedStats.values)
+        val dailyStatsResult = energyPriceRepository.getDailyStats(countryCode, startDate, endDate)
+        val allStats = dailyStatsResult.getOrElse { return Result.failure(it) }.values
 
         if (allStats.isEmpty()) {
             return Result.failure(

@@ -108,7 +108,8 @@ val appModule = module {
         EnergyPriceRepositoryImpl(
             entsoeService = get(),
             eleringService = get(),
-            cache = get()
+            cache = get(),
+            dailyStatsCache = get()
         )
     }
 
@@ -123,8 +124,7 @@ val appModule = module {
 
     factory {
         GetPriceStatisticsUseCase(
-            energyPriceRepository = get(),
-            dailyStatsCache = get()
+            energyPriceRepository = get()
         )
     }
 }
