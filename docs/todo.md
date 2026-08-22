@@ -1,5 +1,4 @@
 # TODO
-- Daily price stats/cache are keyed and fetched using UTC day boundaries (00:00-24:00 UTC), not each country's local calendar day (e.g. Europe/Tallinn), so cached "daily" values don't actually correspond to that country's real day.
 - Persist cache over restarts (e.g mount outside of container)
 - Requests for tomorrows prices/stats can miss cache before noon, and this means they fall thru to actual requests every time - undesired, improve!
 - Consider removing Result wrappers
