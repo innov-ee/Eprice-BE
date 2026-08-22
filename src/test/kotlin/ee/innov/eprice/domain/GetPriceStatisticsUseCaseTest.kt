@@ -185,4 +185,13 @@ class GetPriceStatisticsUseCaseTest {
         )
         assertTrue(invalidRangeResult.isFailure)
     }
+
+    @Test
+    fun `execute with days exceeding max range is rejected`() = runBlocking {
+        val result = useCase.execute("EE", days = 1000)
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        // Guards against fan-out of 1000 concurrent upstream fetches (repository was never called)
+        assertEquals(0, repo.callCount)
+    }
 }

@@ -58,6 +58,11 @@ class GetPriceStatisticsUseCase(
                 if (query.days <= 0) {
                     return Result.failure(IllegalArgumentException("Number of days must be positive."))
                 }
+                if (query.days > MAX_RANGE_DAYS) {
+                    return Result.failure(
+                        IllegalArgumentException("Number of days too large (${query.days}); max is $MAX_RANGE_DAYS days.")
+                    )
+                }
                 val end = today.minusDays(1)
                 val start = end.minusDays(query.days.toLong() - 1)
                 Triple(start, end, query.days)
