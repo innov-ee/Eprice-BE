@@ -5,6 +5,7 @@ import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetPriceStatisticsUseCase
+import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.NoDataFoundException
@@ -33,6 +34,7 @@ fun Route.priceRoutes() {
     val getEnergyPricesUseCase: GetEnergyPricesUseCase by inject()
     val getRollingAveragePriceUseCase: GetRollingAveragePriceUseCase by inject()
     val getPriceStatisticsUseCase: GetPriceStatisticsUseCase by inject()
+    val getPriceSummaryUseCase: GetPriceSummaryUseCase by inject()
     val priceCache: PriceCache by inject()
     val dailyAveragePriceCache: DailyAveragePriceCache by inject()
     val dailyStatsCache: DailyStatsCache by inject()
@@ -97,6 +99,19 @@ fun Route.priceRoutes() {
             call.respond(HttpStatusCode.OK, rollingAverage)
         }.onFailure { error ->
             call.application.log.error("Error fetching rolling average for $countryCode", error)
+            respondWithError(call, error)
+        }
+    }
+
+    get("/api/prices/{countryCode}/stats/summary") {
+        val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
+
+        val result = getPriceSummaryUseCase.execute(countryCode)
+
+        result.onSuccess { summary ->
+            call.respond(HttpStatusCode.OK, summary)
+        }.onFailure { error ->
+            call.application.log.error("Error fetching price stats summary for $countryCode", error)
             respondWithError(call, error)
         }
     }
