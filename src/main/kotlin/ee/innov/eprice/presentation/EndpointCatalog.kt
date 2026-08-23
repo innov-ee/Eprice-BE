@@ -18,10 +18,17 @@ data class EndpointDoc(
     val samples: List<EndpointSample>
 )
 
+object EndpointCategory {
+    const val MONITORING = "Monitoring & Diagnostics"
+    const val ENERGY_PRICES = "Energy Prices"
+    const val PRICE_STATISTICS = "Price Statistics"
+    const val CACHE_ADMINISTRATION = "Cache Administration"
+}
+
 object EndpointCatalog {
     val endpoints: List<EndpointDoc> = listOf(
         EndpointDoc(
-            category = "Monitoring & Diagnostics",
+            category = EndpointCategory.MONITORING,
             method = "GET",
             path = "/monitor",
             description = "Service operational statistics, uptime, and request counters.",
@@ -30,7 +37,7 @@ object EndpointCatalog {
             )
         ),
         EndpointDoc(
-            category = "Monitoring & Diagnostics",
+            category = EndpointCategory.MONITORING,
             method = "GET",
             path = "/health",
             description = "Basic health check returning UP status.",
@@ -39,7 +46,7 @@ object EndpointCatalog {
             )
         ),
         EndpointDoc(
-            category = "Monitoring & Diagnostics",
+            category = EndpointCategory.MONITORING,
             method = "GET",
             path = "/api",
             description = "Root API sanity check.",
@@ -48,7 +55,7 @@ object EndpointCatalog {
             )
         ),
         EndpointDoc(
-            category = "Energy Prices",
+            category = EndpointCategory.ENERGY_PRICES,
             method = "GET",
             path = "/api/prices/{countryCode?}",
             description = "Hourly energy prices for today and tomorrow.",
@@ -61,7 +68,7 @@ object EndpointCatalog {
             )
         ),
         EndpointDoc(
-            category = "Energy Prices",
+            category = EndpointCategory.ENERGY_PRICES,
             method = "GET",
             path = "/api/prices/{countryCode}/avg",
             description = "Rolling average electricity price.",
@@ -72,7 +79,7 @@ object EndpointCatalog {
             )
         ),
         EndpointDoc(
-            category = "Price Statistics",
+            category = EndpointCategory.PRICE_STATISTICS,
             method = "GET",
             path = "/api/prices/{countryCode}/stats/summary",
             description = "Daily price summary with min, max, average, and timestamp bounds.",
@@ -82,7 +89,7 @@ object EndpointCatalog {
             )
         ),
         EndpointDoc(
-            category = "Price Statistics",
+            category = EndpointCategory.PRICE_STATISTICS,
             method = "GET",
             path = "/api/prices/{countryCode}/stats",
             description = "Calculates energy price statistics for named ranges, day counts, or custom dates.",
@@ -96,7 +103,7 @@ object EndpointCatalog {
             )
         ),
         EndpointDoc(
-            category = "Cache Administration",
+            category = EndpointCategory.CACHE_ADMINISTRATION,
             method = "GET",
             path = "/api/cache/clear",
             description = "Clears all in-memory and file-backed caches.",

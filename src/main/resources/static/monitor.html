@@ -660,69 +660,6 @@
         let autoRefreshTimer = null;
         let lastRawJsonResponse = "";
 
-        // Default Fallback Catalog in case server catalog endpoint is unreachable
-        const fallbackCatalog = [
-            {
-                category: "Monitoring & Diagnostics",
-                method: "GET",
-                path: "/monitor",
-                description: "Service operational statistics, uptime, and request counters.",
-                samples: [{ label: "Live Stats", path: "/monitor" }]
-            },
-            {
-                category: "Monitoring & Diagnostics",
-                method: "GET",
-                path: "/health",
-                description: "Basic health check returning UP status.",
-                samples: [{ label: "Health Check", path: "/health" }]
-            },
-            {
-                category: "Energy Prices",
-                method: "GET",
-                path: "/api/prices/{countryCode?}",
-                description: "Hourly energy prices for today and tomorrow.",
-                samples: [
-                    { label: "Estonia (EE)", path: "/api/prices/EE" },
-                    { label: "Latvia (LV)", path: "/api/prices/LV" },
-                    { label: "Lithuania (LT)", path: "/api/prices/LT" },
-                    { label: "Finland (FI)", path: "/api/prices/FI" }
-                ]
-            },
-            {
-                category: "Energy Prices",
-                method: "GET",
-                path: "/api/prices/{countryCode}/avg",
-                description: "Rolling average electricity price.",
-                samples: [{ label: "EE Rolling Avg", path: "/api/prices/EE/avg" }]
-            },
-            {
-                category: "Price Statistics",
-                method: "GET",
-                path: "/api/prices/{countryCode}/stats/summary",
-                description: "Daily price summary with min, max, and average bounds.",
-                samples: [{ label: "EE Summary", path: "/api/prices/EE/stats/summary" }]
-            },
-            {
-                category: "Price Statistics",
-                method: "GET",
-                path: "/api/prices/{countryCode}/stats",
-                description: "Calculates energy price statistics for named ranges or day counts.",
-                samples: [
-                    { label: "Default (Today)", path: "/api/prices/EE/stats" },
-                    { label: "Yesterday", path: "/api/prices/EE/stats?range=yesterday" },
-                    { label: "Tomorrow", path: "/api/prices/EE/stats?range=tomorrow" },
-                    { label: "Past 7 Days", path: "/api/prices/EE/stats?days=7" }
-                ]
-            },
-            {
-                category: "Cache Administration",
-                method: "GET",
-                path: "/api/cache/clear",
-                description: "Clears all in-memory and file-backed caches.",
-                samples: []
-            }
-        ];
-
         // 1. Fetch & Render Catalog
         async function loadCatalog() {
             try {
@@ -731,8 +668,11 @@
                 const catalog = await res.json();
                 renderCatalog(catalog);
             } catch (err) {
-                console.warn("Failed to load /api/meta/routes, using fallback catalog:", err);
-                renderCatalog(fallbackCatalog);
+                console.error("Failed to load /api/meta/routes:", err);
+                const container = document.getElementById("catalogContent");
+                if (container) {
+                    container.innerHTML = `<div class="empty-state" style="color: var(--danger-color);">Failed to load route catalog: ${escapeHtml(err.message)}</div>`;
+                }
             }
         }
 
