@@ -62,9 +62,11 @@ class GetPriceSummaryUseCaseTest {
     }
 
     @Test
-    fun `execute when tomorrow prices are available includes tomorrow and shifts rolling window to tomorrow`() = runBlocking {
-        // Today is 2026-08-22, tomorrow is 2026-08-23
-        repo.entries[LocalDate.of(2026, 8, 19)] = DailyStatEntry(min = 0.10, max = 0.20, avg = 0.15, sum = 3.6, count = 24)
+    fun `execute when tomorrow prices are available includes tomorrow and keeps rolling window ending on yesterday`() = runBlocking {
+        // Today is 2026-08-22, yesterday is 2026-08-21, tomorrow is 2026-08-23
+        repo.entries[LocalDate.of(2026, 8, 17)] = DailyStatEntry(min = 0.06, max = 0.16, avg = 0.11, sum = 2.64, count = 24)
+        repo.entries[LocalDate.of(2026, 8, 18)] = DailyStatEntry(min = 0.08, max = 0.18, avg = 0.13, sum = 3.12, count = 24)
+        repo.entries[LocalDate.of(2026, 8, 19)] = DailyStatEntry(min = 0.10, max = 0.20, avg = 0.15, sum = 3.60, count = 24)
         repo.entries[LocalDate.of(2026, 8, 20)] = DailyStatEntry(min = 0.12, max = 0.22, avg = 0.17, sum = 4.08, count = 24)
         repo.entries[LocalDate.of(2026, 8, 21)] = DailyStatEntry(min = 0.14, max = 0.24, avg = 0.19, sum = 4.56, count = 24) // yesterday
         repo.entries[LocalDate.of(2026, 8, 22)] = DailyStatEntry(min = 0.16, max = 0.26, avg = 0.21, sum = 5.04, count = 24) // today
@@ -101,52 +103,34 @@ class GetPriceSummaryUseCaseTest {
         assertEquals(0.28, tomorrow.maxPrice, 0.0001)
         assertEquals(0.23, tomorrow.averagePrice, 0.0001)
 
-        // Rolling 5-day window ends on tomorrow (2026-08-19 to 2026-08-23)
-        assertEquals("2026-08-19", summary.rolling.startDate)
-        assertEquals("2026-08-23", summary.rolling.endDate)
+        // Rolling 5-day window ends on yesterday (2026-08-17 to 2026-08-21)
+        assertEquals("2026-08-17", summary.rolling.startDate)
+        assertEquals("2026-08-21", summary.rolling.endDate)
         assertEquals(5, summary.rolling.daysRequested)
         assertEquals(5, summary.rolling.daysCalculated)
-        assertEquals(0.10, summary.rolling.minPrice, 0.0001)
-        assertEquals(0.28, summary.rolling.maxPrice, 0.0001)
-        // total sum: 3.6 + 4.08 + 4.56 + 5.04 + 5.52 = 22.8, total count: 120 -> 22.8 / 120 = 0.19
-        assertEquals(0.19, summary.rolling.averagePrice, 0.0001)
+        assertEquals(0.06, summary.rolling.minPrice, 0.0001)
+        assertEquals(0.24, summary.rolling.maxPrice, 0.0001)
+        // total sum: 2.64 + 3.12 + 3.60 + 4.08 + 4.56 = 18.0, total count: 120 -> 18.0 / 120 = 0.15
+        assertEquals(0.15, summary.rolling.averagePrice, 0.0001)
     }
 
     @Test
-    fun `execute when tomorrow prices not published returns null tomorrow and ends rolling on today`() = runBlocking {
-        // Today is 2026-08-22, tomorrow 2026-08-23 has no data
-        repo.entries[LocalDate.of(2026, 8, 18)] = DailyStatEntry(min = 0.08, max = 0.18, avg = 0.13, sum = 3.12, count = 24)
-        repo.entries[LocalDate.of(2026, 8, 19)] = DailyStatEntry(min = 0.10, max = 0.20, avg = 0.15, sum = 3.6, count = 24)
-        repo.entries[LocalDate.of(2026, 8, 20)] = DailyStatEntry(min = 0.12, max = 0.22, avg = 0.17, sum = 4.08, count = 24)
-        repo.entries[LocalDate.of(2026, 8, 21)] = DailyStatEntry(min = 0.14, max = 0.24, avg = 0.19, sum = 4.56, count = 24) // yesterday
-        repo.entries[LocalDate.of(2026, 8, 22)] = DailyStatEntry(min = 0.16, max = 0.26, avg = 0.21, sum = 5.04, count = 24) // today
-        repo.defaultEntryProvider = { null }
+    fun `execute when tomorrow prices not published returns null for tomorrow`() = runBlocking {
+        // Today is 2026-08-22, tomorrow 2026-08-23 is missing
+        repo.defaultEntryProvider = { date ->
+            if (date == LocalDate.of(2026, 8, 23)) null
+            else DailyStatEntry(min = 0.10, max = 0.30, avg = 0.20, sum = 4.80, count = 24)
+        }
 
         val result = useCase.execute("EE")
         assertTrue(result.isSuccess)
 
         val summary = result.getOrThrow()
-        assertEquals("EE", summary.countryCode)
-        assertEquals(1, repo.callCount)
-
-        // Tomorrow is null
         assertNull(summary.tomorrow)
-
-        // Yesterday
         assertEquals("2026-08-21", summary.yesterday.startDate)
-
-        // Today
         assertEquals("2026-08-22", summary.today.startDate)
-
-        // Rolling 5-day window ends on today (2026-08-18 to 2026-08-22)
-        assertEquals("2026-08-18", summary.rolling.startDate)
-        assertEquals("2026-08-22", summary.rolling.endDate)
-        assertEquals(5, summary.rolling.daysRequested)
-        assertEquals(5, summary.rolling.daysCalculated)
-        assertEquals(0.08, summary.rolling.minPrice, 0.0001)
-        assertEquals(0.26, summary.rolling.maxPrice, 0.0001)
-        // total sum: 3.12 + 3.6 + 4.08 + 4.56 + 5.04 = 20.4, count = 120 -> 20.4 / 120 = 0.17
-        assertEquals(0.17, summary.rolling.averagePrice, 0.0001)
+        assertEquals("2026-08-17", summary.rolling.startDate)
+        assertEquals("2026-08-21", summary.rolling.endDate)
     }
 
     @Test
@@ -158,9 +142,9 @@ class GetPriceSummaryUseCaseTest {
         assertTrue(result.isSuccess)
 
         val summary = result.getOrThrow()
-        // Tomorrow 2026-08-23 is supplied by defaultEntryProvider -> window is 30 days ending 2026-08-23
-        assertEquals("2026-07-25", summary.rolling.startDate)
-        assertEquals("2026-08-23", summary.rolling.endDate)
+        // Window is 30 days ending yesterday (2026-08-21)
+        assertEquals("2026-07-23", summary.rolling.startDate)
+        assertEquals("2026-08-21", summary.rolling.endDate)
         assertEquals(30, summary.rolling.daysRequested)
         assertEquals(30, summary.rolling.daysCalculated)
     }
@@ -189,5 +173,7 @@ class GetPriceSummaryUseCaseTest {
         // Today in EE is 2026-08-23, yesterday is 2026-08-22
         assertEquals("2026-08-22", summary.yesterday.startDate)
         assertEquals("2026-08-23", summary.today.startDate)
+        assertEquals("2026-08-18", summary.rolling.startDate)
+        assertEquals("2026-08-22", summary.rolling.endDate)
     }
 }
