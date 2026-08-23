@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPrice Service Monitor & API Explorer</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #38bdf8;
+            --accent-blue-hover: #0284c7;
+            --accent-green: #22c55e;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --card-border: #334155;
+            --code-bg: #090d16;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            line-height: 1.5;
+            padding: 24px 16px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 16px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand .badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            background-color: var(--accent-blue);
+            color: #04101d;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn:hover {
+            background-color: var(--accent-blue-hover);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: #475569;
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .auto-refresh select {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--card-border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        /* Monitor Section */
+        .monitor-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .monitor-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--bg-tertiary);
+            padding-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .monitor-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .last-updated-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        #refreshMonitorBtn {
+            width: 105px;
+            min-width: 105px;
+            height: 28px;
+            padding: 0 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+
+        .monitor-card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-weight: 600;
+        }
+
+        .status-pill.up {
+            background-color: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-pill.down {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .stat-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            line-height: 1.2;
+        }
+
+        .stat-subtext {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Section Headers */
+        .section-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 1.7rem;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Two Column Layout */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Column Wrappers */
+        .catalog-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .viewer-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: sticky;
+            top: 24px;
+        }
+
+        /* Endpoint Catalog */
+        .catalog-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        #catalogContent {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .category-group {
+            background: var(--bg-secondary);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        .category-header {
+            background: var(--bg-tertiary);
+            padding: 12px 18px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .endpoint-list {
+            display: flex;
+            flex-direction: column;
+            divide-y: 1px solid var(--bg-tertiary);
+        }
+
+        .endpoint-item {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--bg-tertiary);
+        }
+
+        .endpoint-item:last-child {
+            border-bottom: none;
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+
+        .method-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #0284c7;
+            color: white;
+            font-family: var(--font-mono);
+        }
+
+        .endpoint-path {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent-blue);
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .endpoint-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        .samples-wrap {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .samples-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-right: 2px;
+        }
+
+        .sample-pill {
+            background: var(--bg-primary);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sample-pill:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background: rgba(56, 189, 248, 0.08);
+        }
+
+        .sample-pill.active {
+            border-color: var(--accent-blue);
+            background: rgba(56, 189, 248, 0.2);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* In-Page Response Viewer */
+        .viewer-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        .viewer-header {
+            padding: 14px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .viewer-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .viewer-bar {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--card-border);
+            background: var(--bg-secondary);
+            display: flex;
+            gap: 8px;
+        }
+
+        .url-input {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .url-input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .viewer-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .meta-pill {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .meta-pill.status-2xx {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+        }
+
+        .meta-pill.status-4xx {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-amber);
+        }
+
+        .meta-pill.status-5xx {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+
+        .code-block-wrap {
+            position: relative;
+            max-height: 600px;
+            overflow: auto;
+            background: var(--code-bg);
+            padding: 16px;
+        }
+
+        pre code {
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Simple JSON highlight styling */
+        .json-key { color: #38bdf8; }
+        .json-string { color: #a5d6a7; }
+        .json-number { color: #f59e0b; }
+        .json-boolean { color: #c084fc; }
+        .json-null { color: #94a3b8; }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="brand">
+                <h1>EPrice BE</h1>
+            </div>
+        </header>
+
+        <!-- Live Monitor Dashboard -->
+        <section class="monitor-card">
+            <div class="monitor-card-header">
+                <div class="monitor-card-title">
+                    <span>Operational Metrics</span>
+                    <span class="status-pill up" id="healthStatusPill">
+                        <span class="status-dot"></span>
+                        <span id="healthStatusText">UP</span>
+                    </span>
+                </div>
+                <div class="monitor-actions">
+                    <span id="lastUpdatedText" class="last-updated-text">Updated: just now</span>
+                    <div class="auto-refresh">
+                        <input type="checkbox" id="autoRefreshCheckbox" onchange="toggleAutoRefresh()">
+                        <label for="autoRefreshCheckbox">Auto Refresh</label>
+                        <select id="autoRefreshInterval" onchange="updateAutoRefreshInterval()">
+                            <option value="5000">5s</option>
+                            <option value="10000" selected>10s</option>
+                            <option value="30000">30s</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-sm" id="refreshMonitorBtn" onclick="refreshMonitor()">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">System Uptime</div>
+                    <div class="stat-value" id="statUptime">--</div>
+                    <div class="stat-subtext">Elapsed since startup</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Incoming Total</div>
+                    <div class="stat-value" id="statIncomingTotal">--</div>
+                    <div class="stat-subtext">Total requests received</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Incoming Rate</div>
+                    <div class="stat-value" id="statIncomingAvg">--</div>
+                    <div class="stat-subtext">Avg requests / hour</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Outgoing Total</div>
+                    <div class="stat-value" id="statOutgoingTotal">--</div>
+                    <div class="stat-subtext">Upstream API requests</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Outgoing Rate</div>
+                    <div class="stat-value" id="statOutgoingAvg">--</div>
+                    <div class="stat-subtext">Avg requests / hour</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Layout: Endpoints (Left) + Response (Right) -->
+        <div class="main-layout">
+            <!-- Left Column: Catalog -->
+            <div class="catalog-column">
+                <h2 class="section-header">
+                    Available Endpoints
+                </h2>
+                <div id="catalogContent">
+                    <div class="empty-state">Loading endpoint catalog...</div>
+                </div>
+            </div>
+
+            <!-- Right Column: In-Page JSON Response Viewer -->
+            <div class="viewer-column">
+                <h2 class="section-header">
+                    Response Inspector
+                </h2>
+                <div class="viewer-container">
+                    <div class="viewer-bar">
+                        <input type="text" id="customUrlInput" class="url-input" value="/monitor" placeholder="/api/prices/EE" />
+                        <button class="btn" id="executeBtn" onclick="executeCurrentUrl()">
+                            Send
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="copyResponseJson()" title="Copy formatted JSON to clipboard">
+                            📋 Copy
+                        </button>
+                    </div>
+
+                    <div class="viewer-meta" id="viewerMeta" style="display: none;">
+                        <span id="metaStatus" class="meta-pill status-2xx">200 OK</span>
+                        <span id="metaLatency">0 ms</span>
+                        <span id="metaTimestamp">--:--:--</span>
+                    </div>
+
+                    <div class="code-block-wrap">
+                        <pre><code id="jsonCodeView"><div class="empty-state">Click any endpoint sample on the left or click 'Send' to inspect API responses.</div></code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshTimer = null;
+        let lastRawJsonResponse = "";
+
+        // 1. Fetch & Render Catalog
+        async function loadCatalog() {
+            try {
+                const res = await fetch("/api/meta/routes");
+                if (!res.ok) throw new Error("Status " + res.status);
+                const catalog = await res.json();
+                renderCatalog(catalog);
+            } catch (err) {
+                console.error("Failed to load /api/meta/routes:", err);
+                const container = document.getElementById("catalogContent");
+                if (container) {
+                    container.innerHTML = `<div class="empty-state" style="color: var(--danger-color);">Failed to load route catalog: ${escapeHtml(err.message)}</div>`;
+                }
+            }
+        }
+
+        function renderCatalog(catalog) {
+            const container = document.getElementById("catalogContent");
+            if (!catalog || catalog.length === 0) {
+                container.innerHTML = '<div class="empty-state">No endpoints found.</div>';
+                return;
+            }
+
+            // Group by category
+            const grouped = {};
+            catalog.forEach(item => {
+                const cat = item.category || "General";
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(item);
+            });
+
+            let html = "";
+            for (const [category, items] of Object.entries(grouped)) {
+                html += `
+                    <div class="category-group">
+                        <div class="category-header">${escapeHtml(category)}</div>
+                        <div class="endpoint-list">
+                `;
+
+                items.forEach(item => {
+                    const samplesHtml = (item.samples || []).map(sample => `
+                        <button class="sample-pill" onclick="tryEndpoint('${escapeHtml(sample.path)}', this)">
+                            <span>▶</span> ${escapeHtml(sample.label)}
+                        </button>
+                    `).join("");
+
+                    html += `
+                        <div class="endpoint-item">
+                            <div class="endpoint-header">
+                                <span class="method-badge">${escapeHtml(item.method || "GET")}</span>
+                                <span class="endpoint-path">${escapeHtml(item.path)}</span>
+                            </div>
+                            <div class="endpoint-desc">${escapeHtml(item.description || "")}</div>
+                            ${samplesHtml ? `
+                                <div class="samples-wrap">
+                                    <span class="samples-label">Samples:</span>
+                                    ${samplesHtml}
+                                </div>
+                            ` : ""}
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+        }
+
+        // 2. Fetch Live Monitor Stats
+        async function refreshMonitor() {
+            const refreshBtn = document.getElementById("refreshMonitorBtn");
+            if (refreshBtn) {
+                refreshBtn.innerHTML = `<span class="spinner"></span> Refresh`;
+                refreshBtn.disabled = true;
+            }
+
+            try {
+                // Fetch stats and health in parallel
+                const [statsRes, healthRes] = await Promise.all([
+                    fetch("/monitor"),
+                    fetch("/health")
+                ]);
+
+                if (statsRes.ok) {
+                    const stats = await statsRes.json();
+                    document.getElementById("statUptime").textContent = stats.uptime || "--";
+                    document.getElementById("statIncomingTotal").textContent = Number(stats.totalIncomingRequests || 0).toLocaleString();
+                    document.getElementById("statIncomingAvg").textContent = `${(stats.avgIncomingPerHour || 0).toFixed(1)} / hr`;
+                    document.getElementById("statOutgoingTotal").textContent = Number(stats.totalOutgoingRequests || 0).toLocaleString();
+                    document.getElementById("statOutgoingAvg").textContent = `${(stats.avgOutgoingPerHour || 0).toFixed(1)} / hr`;
+                }
+
+                const healthStatusPill = document.getElementById("healthStatusPill");
+                const healthStatusText = document.getElementById("healthStatusText");
+
+                if (healthRes.ok) {
+                    healthStatusPill.className = "status-pill up";
+                    healthStatusText.textContent = "UP";
+                } else {
+                    healthStatusPill.className = "status-pill down";
+                    healthStatusText.textContent = "DOWN";
+                }
+
+                const now = new Date();
+                document.getElementById("lastUpdatedText").textContent = "Updated: " + now.toLocaleTimeString();
+
+            } catch (err) {
+                console.error("Monitor refresh failed:", err);
+                const healthStatusPill = document.getElementById("healthStatusPill");
+                const healthStatusText = document.getElementById("healthStatusText");
+                healthStatusPill.className = "status-pill down";
+                healthStatusText.textContent = "UNREACHABLE";
+            } finally {
+                if (refreshBtn) {
+                    refreshBtn.innerHTML = `🔄 Refresh`;
+                    refreshBtn.disabled = false;
+                }
+            }
+        }
+
+        // 3. In-Page Endpoint Execution & Inspection
+        async function tryEndpoint(path, buttonEl) {
+            document.querySelectorAll(".sample-pill").forEach(el => el.classList.remove("active"));
+            if (buttonEl) {
+                buttonEl.classList.add("active");
+            }
+            document.getElementById("customUrlInput").value = path;
+            await executeUrl(path);
+        }
+
+        async function executeCurrentUrl() {
+            const path = document.getElementById("customUrlInput").value.trim();
+            if (path) {
+                await executeUrl(path);
+            }
+        }
+
+        async function executeUrl(path) {
+            const executeBtn = document.getElementById("executeBtn");
+            const codeView = document.getElementById("jsonCodeView");
+            const viewerMeta = document.getElementById("viewerMeta");
+            const metaStatus = document.getElementById("metaStatus");
+            const metaLatency = document.getElementById("metaLatency");
+            const metaTimestamp = document.getElementById("metaTimestamp");
+
+            executeBtn.innerHTML = `<span class="spinner"></span>`;
+            executeBtn.disabled = true;
+            codeView.innerHTML = "Sending request to " + escapeHtml(path) + "...";
+
+            const startTime = performance.now();
+            try {
+                const res = await fetch(path);
+                const duration = Math.round(performance.now() - startTime);
+                const text = await res.text();
+
+                viewerMeta.style.display = "flex";
+                metaLatency.textContent = `${duration} ms`;
+                metaTimestamp.textContent = new Date().toLocaleTimeString();
+
+                metaStatus.textContent = `${res.status} ${res.statusText || ""}`.trim();
+                if (res.status >= 200 && res.status < 300) {
+                    metaStatus.className = "meta-pill status-2xx";
+                } else if (res.status >= 400 && res.status < 500) {
+                    metaStatus.className = "meta-pill status-4xx";
+                } else {
+                    metaStatus.className = "meta-pill status-5xx";
+                }
+
+                lastRawJsonResponse = text;
+
+                try {
+                    const parsed = JSON.parse(text);
+                    const formatted = JSON.stringify(parsed, null, 2);
+                    lastRawJsonResponse = formatted;
+                    codeView.innerHTML = syntaxHighlightJson(formatted);
+                } catch {
+                    codeView.textContent = text;
+                }
+
+                // If executing monitor or cache clear, refresh the top monitor widget too
+                if (path === "/monitor" || path === "/api/cache/clear") {
+                    refreshMonitor();
+                }
+
+            } catch (err) {
+                const duration = Math.round(performance.now() - startTime);
+                viewerMeta.style.display = "flex";
+                metaStatus.className = "meta-pill status-5xx";
+                metaStatus.textContent = "Network Error";
+                metaLatency.textContent = `${duration} ms`;
+                metaTimestamp.textContent = new Date().toLocaleTimeString();
+                codeView.textContent = "Failed to fetch: " + err.message;
+                lastRawJsonResponse = err.message;
+            } finally {
+                executeBtn.innerHTML = "Send";
+                executeBtn.disabled = false;
+            }
+        }
+
+        // 4. Auto-refresh controls
+        function toggleAutoRefresh() {
+            const enabled = document.getElementById("autoRefreshCheckbox").checked;
+            if (enabled) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
+
+        function updateAutoRefreshInterval() {
+            if (document.getElementById("autoRefreshCheckbox").checked) {
+                startAutoRefresh();
+            }
+        }
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            const interval = parseInt(document.getElementById("autoRefreshInterval").value, 10) || 10000;
+            autoRefreshTimer = setInterval(() => {
+                refreshMonitor();
+            }, interval);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+            }
+        }
+
+        // 5. Utility Helpers
+        function copyResponseJson() {
+            if (!lastRawJsonResponse) return;
+            navigator.clipboard.writeText(lastRawJsonResponse).then(() => {
+                const btn = event.target;
+                const orig = btn.innerHTML;
+                btn.innerHTML = "✅ Copied!";
+                setTimeout(() => { btn.innerHTML = orig; }, 1500);
+            }).catch(err => console.error("Copy failed:", err));
+        }
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function syntaxHighlightJson(json) {
+            json = escapeHtml(json);
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener("DOMContentLoaded", () => {
+            loadCatalog();
+            refreshMonitor();
+        });
+    </script>
+</body>
+</html>

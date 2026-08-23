@@ -18,6 +18,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.application.log
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -46,6 +47,8 @@ fun Route.priceRoutes() {
         proceed()
     }
 
+    staticResources("/monitor.html", "static", index = "monitor.html")
+
     get("/health") {
         call.respond(HttpStatusCode.OK, mapOf("status" to "UP"))
     }
@@ -56,6 +59,10 @@ fun Route.priceRoutes() {
 
     get("/api") {
         call.respond("All good")
+    }
+
+    get("/api/meta/routes") {
+        call.respond(HttpStatusCode.OK, EndpointCatalog.endpoints)
     }
 
     get("/api/cache/clear") { // get so i can invoke it with browser
