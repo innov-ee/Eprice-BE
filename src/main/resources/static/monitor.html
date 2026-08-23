@@ -151,6 +151,33 @@
             margin-bottom: 16px;
             border-bottom: 1px solid var(--bg-tertiary);
             padding-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .monitor-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .last-updated-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        #refreshMonitorBtn {
+            width: 105px;
+            min-width: 105px;
+            height: 28px;
+            padding: 0 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            box-sizing: border-box;
         }
 
         .monitor-card-title {
@@ -528,22 +555,7 @@
         <!-- Header -->
         <header>
             <div class="brand">
-                <h1>⚡ EPrice Service</h1>
-                <span class="badge">Monitor & API Sandbox</span>
-            </div>
-            <div class="header-actions">
-                <div class="auto-refresh">
-                    <input type="checkbox" id="autoRefreshCheckbox" onchange="toggleAutoRefresh()">
-                    <label for="autoRefreshCheckbox">Auto Refresh</label>
-                    <select id="autoRefreshInterval" onchange="updateAutoRefreshInterval()">
-                        <option value="5000">5s</option>
-                        <option value="10000" selected>10s</option>
-                        <option value="30000">30s</option>
-                    </select>
-                </div>
-                <button class="btn" id="refreshMonitorBtn" onclick="refreshMonitor()">
-                    🔄 Refresh Monitor
-                </button>
+                <h1>EPrice BE</h1>
             </div>
         </header>
 
@@ -557,8 +569,20 @@
                         <span id="healthStatusText">UP</span>
                     </span>
                 </div>
-                <div id="lastUpdatedText" style="font-size: 0.75rem; color: var(--text-muted);">
-                    Updated: just now
+                <div class="monitor-actions">
+                    <span id="lastUpdatedText" class="last-updated-text">Updated: just now</span>
+                    <div class="auto-refresh">
+                        <input type="checkbox" id="autoRefreshCheckbox" onchange="toggleAutoRefresh()">
+                        <label for="autoRefreshCheckbox">Auto Refresh</label>
+                        <select id="autoRefreshInterval" onchange="updateAutoRefreshInterval()">
+                            <option value="5000">5s</option>
+                            <option value="10000" selected>10s</option>
+                            <option value="30000">30s</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-sm" id="refreshMonitorBtn" onclick="refreshMonitor()">
+                        🔄 Refresh
+                    </button>
                 </div>
             </div>
             <div class="stats-grid">
@@ -771,9 +795,10 @@
         // 2. Fetch Live Monitor Stats
         async function refreshMonitor() {
             const refreshBtn = document.getElementById("refreshMonitorBtn");
-            const originalText = refreshBtn.innerHTML;
-            refreshBtn.innerHTML = `<span class="spinner"></span> Refreshing...`;
-            refreshBtn.disabled = true;
+            if (refreshBtn) {
+                refreshBtn.innerHTML = `<span class="spinner"></span> Refresh`;
+                refreshBtn.disabled = true;
+            }
 
             try {
                 // Fetch stats and health in parallel
@@ -812,8 +837,10 @@
                 healthStatusPill.className = "status-pill down";
                 healthStatusText.textContent = "UNREACHABLE";
             } finally {
-                refreshBtn.innerHTML = originalText;
-                refreshBtn.disabled = false;
+                if (refreshBtn) {
+                    refreshBtn.innerHTML = `🔄 Refresh`;
+                    refreshBtn.disabled = false;
+                }
             }
         }
 

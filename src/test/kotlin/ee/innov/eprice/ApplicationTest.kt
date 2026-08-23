@@ -319,7 +319,8 @@ class ApplicationTest {
                 assertEquals(HttpStatusCode.OK, response.status)
                 val body = response.bodyAsText()
                 assertTrue(body.contains("<title>EPrice Service Monitor & API Explorer</title>"))
-                assertTrue(body.contains("Refresh Monitor"))
+                assertTrue(body.contains("Operational Metrics"))
+                assertTrue(body.contains("refreshMonitor"))
             }
         )
     }
