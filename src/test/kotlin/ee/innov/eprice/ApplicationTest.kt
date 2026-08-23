@@ -11,6 +11,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
@@ -377,13 +378,21 @@ class ApplicationTest {
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
             testBlock = {
+                // First make an API call to generate some incoming and outgoing metrics
+                client.get("/api/prices")
+
                 val response = client.get("/monitor")
 
                 assertEquals(HttpStatusCode.OK, response.status)
                 val body = response.bodyAsText()
                 assertTrue(body.contains(""""uptime":"""))
-                assertTrue(body.contains(""""totalIncomingRequests":"""))
-                assertTrue(body.contains(""""totalOutgoingRequests":"""))
+                assertTrue(body.contains(""""totalIncomingRequests":2""")) // /api/prices + /monitor
+                assertTrue(body.contains(""""totalOutgoingRequests":1""")) // Elering call
+                assertTrue(body.contains(""""outgoingEleringRequests":1"""))
+                assertTrue(body.contains(""""outgoingEntsoeRequests":0"""))
+                assertTrue(body.contains(""""cacheHits":0"""))
+                assertTrue(body.contains(""""cacheMisses":1"""))
+                assertTrue(body.contains(""""cacheHitRatio":0.0"""))
             }
         )
     }
@@ -439,15 +448,20 @@ class ApplicationTest {
         // ARRANGE:
         val mockEngine = MockEngine(engineHandler)
 
-        // The mock client MUST have ContentNegotiation for EleringService.body<T>()
-        val mockHttpClient = HttpClient(mockEngine) {
-            install(ContentNegotiation) {
-                json() // For EleringService
-            }
-        }
-
         val testModule = module {
-            single { mockHttpClient } // Override the real HttpClient
+            single {
+                val monitor = get<ee.innov.eprice.monitoring.ServiceMonitor>()
+                HttpClient(mockEngine) {
+                    install(createClientPlugin("OutgoingMonitor") {
+                        onRequest { request, _ ->
+                            monitor.incrementOutgoing(request.url.host)
+                        }
+                    })
+                    install(ContentNegotiation) {
+                        json() // For EleringService
+                    }
+                }
+            } // Override the real HttpClient
             single(qualifier = named("entsoeApiKey")) { "TEST_KEY" }
             single<PriceCache> { NoOpPriceCache() }
             single<DailyStatsCache> { NoOpDailyStatsCache() }

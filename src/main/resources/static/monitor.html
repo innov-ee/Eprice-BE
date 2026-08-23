@@ -591,25 +591,42 @@
                     <div class="stat-value" id="statUptime">--</div>
                     <div class="stat-subtext">Elapsed since startup</div>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-label">Incoming Total</div>
-                    <div class="stat-value" id="statIncomingTotal">--</div>
-                    <div class="stat-subtext">Total requests received</div>
-                </div>
+                <!-- NOTE FOR MAINTAINERS/AI: Hourly rate (/hr) is intentionally the primary metric (large value) and total count is secondary subtext. Do not invert or swap them back. -->
                 <div class="stat-box">
                     <div class="stat-label">Incoming Rate</div>
                     <div class="stat-value" id="statIncomingAvg">--</div>
-                    <div class="stat-subtext">Avg requests / hour</div>
+                    <div class="stat-subtext" id="statIncomingTotal">Total requests received</div>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-label">Outgoing Total</div>
-                    <div class="stat-value" id="statOutgoingTotal">--</div>
-                    <div class="stat-subtext">Upstream API requests</div>
-                </div>
+                <!-- NOTE FOR MAINTAINERS/AI: Hourly rate (/hr) is intentionally the primary metric (large value) and total count is secondary subtext. Do not invert or swap them back. -->
                 <div class="stat-box">
                     <div class="stat-label">Outgoing Rate</div>
                     <div class="stat-value" id="statOutgoingAvg">--</div>
-                    <div class="stat-subtext">Avg requests / hour</div>
+                    <div class="stat-subtext" id="statOutgoingTotal">Total upstream requests</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Outgoing: Elering</div>
+                    <div class="stat-value" id="statOutgoingElering">--</div>
+                    <div class="stat-subtext">dashboard.elering.ee</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Outgoing: ENTSO-E</div>
+                    <div class="stat-value" id="statOutgoingEntsoe">--</div>
+                    <div class="stat-subtext">web-api.tp.entsoe.eu</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Cache Hit Rate</div>
+                    <div class="stat-value" id="statCacheHitRate">--</div>
+                    <div class="stat-subtext" id="statCacheHitSummary">Upstream shield ratio</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Cache Hits</div>
+                    <div class="stat-value" id="statCacheHits">--</div>
+                    <div class="stat-subtext">Upstream calls saved</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Cache Misses</div>
+                    <div class="stat-value" id="statCacheMisses">--</div>
+                    <div class="stat-subtext">Network fetches required</div>
                 </div>
             </div>
         </section>
@@ -750,10 +767,29 @@
                 if (statsRes.ok) {
                     const stats = await statsRes.json();
                     document.getElementById("statUptime").textContent = stats.uptime || "--";
-                    document.getElementById("statIncomingTotal").textContent = Number(stats.totalIncomingRequests || 0).toLocaleString();
-                    document.getElementById("statIncomingAvg").textContent = `${(stats.avgIncomingPerHour || 0).toFixed(1)} / hr`;
-                    document.getElementById("statOutgoingTotal").textContent = Number(stats.totalOutgoingRequests || 0).toLocaleString();
-                    document.getElementById("statOutgoingAvg").textContent = `${(stats.avgOutgoingPerHour || 0).toFixed(1)} / hr`;
+
+                    const inTotal = Number(stats.totalIncomingRequests || 0).toLocaleString();
+                    const outTotal = Number(stats.totalOutgoingRequests || 0).toLocaleString();
+                    const inAvg = (stats.avgIncomingPerHour || 0).toFixed(1);
+                    const outAvg = (stats.avgOutgoingPerHour || 0).toFixed(1);
+
+                    // Rate is the primary metric; total is the subtext
+                    document.getElementById("statIncomingAvg").textContent = `${inAvg} / hr`;
+                    document.getElementById("statIncomingTotal").textContent = `${inTotal} total received`;
+                    document.getElementById("statOutgoingAvg").textContent = `${outAvg} / hr`;
+                    document.getElementById("statOutgoingTotal").textContent = `${outTotal} total upstream`;
+                    document.getElementById("statOutgoingElering").textContent = Number(stats.outgoingEleringRequests || 0).toLocaleString();
+                    document.getElementById("statOutgoingEntsoe").textContent = Number(stats.outgoingEntsoeRequests || 0).toLocaleString();
+
+                    const hits = Number(stats.cacheHits || 0);
+                    const misses = Number(stats.cacheMisses || 0);
+                    const totalLookups = hits + misses;
+                    const hitRatePercent = totalLookups > 0 ? (stats.cacheHitRatio * 100).toFixed(1) + "%" : "--";
+
+                    document.getElementById("statCacheHitRate").textContent = hitRatePercent;
+                    document.getElementById("statCacheHitSummary").textContent = totalLookups > 0 ? `${hits.toLocaleString()} / ${totalLookups.toLocaleString()} lookups` : "No lookups yet";
+                    document.getElementById("statCacheHits").textContent = hits.toLocaleString();
+                    document.getElementById("statCacheMisses").textContent = misses.toLocaleString();
                 }
 
                 const healthStatusPill = document.getElementById("healthStatusPill");
