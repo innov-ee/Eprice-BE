@@ -187,6 +187,26 @@ class ApplicationTest {
     }
 
     @Test
+    fun `GET prices should return 502 BadGateway on unexpected non-XML response from Entsoe`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringNoDataJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = """{"error": "Too Many Requests"}""",
+                entsoeStatus = HttpStatusCode.OK
+            ),
+            testBlock = {
+                val response = client.get("/api/prices")
+
+                assertEquals(HttpStatusCode.BadGateway, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""error":"Server error (code 200)""""))
+                assertTrue(body.contains("Unexpected non-XML response from ENTSO-E"))
+            }
+        )
+    }
+
+    @Test
     fun `GET prices stats should return 200 OK with aggregated statistics`() {
         runPriceApiTest(
             engineHandler = createMockEngineHandler(

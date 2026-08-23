@@ -17,6 +17,7 @@ data class PublicationMarketDocument(
 
 data class TimeSeries(
     val mRID: String? = null,
+    val curveType: String? = null,
     @JsonProperty("Period")
     @JacksonXmlElementWrapper(useWrapping = false)
     val period: List<Period> = emptyList()
@@ -30,33 +31,78 @@ data class Period(
     val point: List<Point> = emptyList()
 )
 
-data class TimeInterval(val start: String)
+data class TimeInterval(
+    val start: String,
+    val end: String? = null
+)
 data class Point(
     val position: Int,
     @JsonProperty("price.amount")
     val priceAmount: Double
 )
 
+private fun parseResolutionMinutes(resolution: String): Long {
+    val trimmed = resolution.trim().uppercase()
+    return when {
+        trimmed == "PT1H" || trimmed == "PT60M" -> 60L
+        trimmed.startsWith("PT") && trimmed.endsWith("M") ->
+            trimmed.removePrefix("PT").removeSuffix("M").toLongOrNull() ?: 60L
+        trimmed.startsWith("PT") && trimmed.endsWith("H") ->
+            (trimmed.removePrefix("PT").removeSuffix("H").toLongOrNull() ?: 1L) * 60L
+        else -> 60L
+    }
+}
+
 fun PublicationMarketDocument.toDomainEnergyPrices(): List<DomainEnergyPrice> {
     return this.timeSeries.flatMap { timeSeries ->
         timeSeries.period.flatMap { period ->
-            val resolutionMinutes = period.resolution.removePrefix("PT")
-                .removeSuffix("M").toLongOrNull() ?: 60L
+            val resolutionMinutes = parseResolutionMinutes(period.resolution)
             val periodStartInstant = Instant.from(
                 DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.start)
             )
 
-            period.point.map { point ->
-                val pricePerKWh = point.priceAmount / 1000.0
-                val intervalStart = periodStartInstant.plus(
-                    (point.position - 1) * resolutionMinutes,
-                    ChronoUnit.MINUTES
-                )
+            val sortedPoints = period.point.sortedBy { it.position }
+            if (sortedPoints.isEmpty()) {
+                emptyList()
+            } else {
+                val totalPositions = if (!period.timeInterval.end.isNullOrBlank()) {
+                    try {
+                        val periodEndInstant = Instant.from(
+                            DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.end)
+                        )
+                        val durationMinutes = java.time.Duration.between(periodStartInstant, periodEndInstant).toMinutes()
+                        (durationMinutes / resolutionMinutes).toInt()
+                    } catch (_: Exception) {
+                        sortedPoints.last().position
+                    }
+                } else {
+                    sortedPoints.last().position
+                }
 
-                DomainEnergyPrice(
-                    startTime = intervalStart,
-                    pricePerKWh = pricePerKWh
-                )
+                val endPosition = maxOf(totalPositions, sortedPoints.last().position)
+                val pointMap = sortedPoints.associateBy { it.position }
+
+                var currentPriceAmount = sortedPoints.first().priceAmount
+                (1..endPosition).mapNotNull { pos ->
+                    pointMap[pos]?.let { point ->
+                        currentPriceAmount = point.priceAmount
+                    }
+
+                    if (pos < sortedPoints.first().position) {
+                        null
+                    } else {
+                        val pricePerKWh = currentPriceAmount / 1000.0
+                        val intervalStart = periodStartInstant.plus(
+                            (pos - 1) * resolutionMinutes,
+                            ChronoUnit.MINUTES
+                        )
+
+                        DomainEnergyPrice(
+                            startTime = intervalStart,
+                            pricePerKWh = pricePerKWh
+                        )
+                    }
+                }
             }
         }
     }

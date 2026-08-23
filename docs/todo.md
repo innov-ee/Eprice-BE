@@ -10,6 +10,7 @@
 - Implement proper logger
 - Pass proper coroutine scopes
 - Ensure coroutine CancellationExceptions are not swallowed
+- Verify how missing prices are handled.
 
 # Nits
 - Logging sometimes happens twice per request: in UseCase and Routes
