@@ -10,6 +10,7 @@ import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.toApiError
+import org.slf4j.LoggerFactory
 import java.time.Instant
 
 class EnergyPriceRepositoryImpl(
@@ -18,13 +19,14 @@ class EnergyPriceRepositoryImpl(
     private val cache: PriceCache
 ) : EnergyPriceRepository {
 
+    private val logger = LoggerFactory.getLogger(EnergyPriceRepositoryImpl::class.java)
+
     override suspend fun getPrices(
         countryCode: String,
         start: Instant,
         end: Instant,
         cacheResults: Boolean,
     ): Result<List<DomainEnergyPrice>> {
-
         val cacheKey = "${countryCode}_${start}_$end"
 
         val cachedPrices = cache.get(cacheKey)
@@ -46,7 +48,8 @@ class EnergyPriceRepositoryImpl(
     }
 
     /**
-     * Contains the original network-fetching logic.
+     * Contains the network-fetching logic.
+     * Strategy: Try Elering first, fallback to ENTSO-E.
      */
     private suspend fun fetchFromNetwork(
         countryCode: String,
@@ -61,14 +64,14 @@ class EnergyPriceRepositoryImpl(
                 return Result.success(prices)
             }
         } catch (e: NoDataFoundException) {
-            println(e)
+            logger.info("Elering reported no data for $countryCode ($start to $end), attempting ENTSO-E fallback")
         } catch (e: Exception) {
-            println(e)
+            logger.warn("Elering fetch failed for $countryCode ($start to $end): ${e.message}, attempting ENTSO-E fallback")
         }
 
-        // Elering failed, try entso-e
+        // Elering failed or had no data, try ENTSO-E fallback
         val biddingZone = countryCode.toBiddingZone()
-            ?: return Result.failure( // Return a specific error if mapping fails
+            ?: return Result.failure(
                 ApiError.Unknown(
                     "Unsupported country code for ENTSO-E fallback: $countryCode",
                     IllegalArgumentException("No bidding zone mapping for $countryCode")

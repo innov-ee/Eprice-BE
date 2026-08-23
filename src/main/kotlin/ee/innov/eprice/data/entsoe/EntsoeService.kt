@@ -5,9 +5,12 @@ import ee.innov.eprice.domain.model.EntsoeApiException
 import ee.innov.eprice.domain.model.NoDataFoundException
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.headers
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
+import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -17,6 +20,8 @@ class EntsoeService(
     private val xmlMapper: XmlMapper,
     private val apiKey: String
 ) {
+    private val logger = LoggerFactory.getLogger(EntsoeService::class.java)
+
     private val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm")
         .withZone(ZoneOffset.UTC)
 
@@ -41,6 +46,11 @@ class EntsoeService(
         val periodEnd = formatter.format(end)
 
         val response: HttpResponse = client.get("https://web-api.tp.entsoe.eu/api") {
+            // Force XML: the shared HttpClient's ContentNegotiation plugin (for Elering) would
+            // otherwise default to Accept: application/json, causing ENTSO-E to return JSON.
+            headers {
+                append(HttpHeaders.Accept, "application/xml")
+            }
             url {
                 parameters.append("securityToken", apiKey)
                 parameters.append("documentType", "A44")
@@ -50,24 +60,47 @@ class EntsoeService(
                 parameters.append("periodEnd", periodEnd)
             }
         }
-        val xmlString = response.bodyAsText()
+        val rawBody = response.bodyAsText()
+        val trimmed = rawBody.trim()
 
-        if (!response.status.isSuccess() || xmlString.contains("<Reason>")) {
-            if (xmlString.contains("No matching data found", ignoreCase = true)) {
+        logger.info("[ENTSO-E RESPONSE] Status=${response.status.value}, Length=${trimmed.length}, Preview=${trimmed.take(120).replace("\n", " ")}")
+
+        if (!response.status.isSuccess()) {
+            if (trimmed.contains("No matching data found", ignoreCase = true)) {
+                throw NoDataFoundException(
+                    "No matching data found for bidding zone $biddingZone in period $periodStart - $periodEnd"
+                )
+            }
+            throw EntsoeApiException(
+                response.status.value,
+                "Failed to fetch data from ENTSO-E (status ${response.status.value}): $trimmed"
+            )
+        }
+
+        if (!trimmed.startsWith("<")) {
+            logger.warn("[ENTSO-E ERROR SCENARIO DETECTED] Response is not XML: $trimmed")
+            throw EntsoeApiException(
+                response.status.value,
+                "Unexpected non-XML response from ENTSO-E: $trimmed"
+            )
+        }
+
+        if (trimmed.contains("<Reason>")) {
+            if (trimmed.contains("No matching data found", ignoreCase = true)) {
                 // This is a special case, not a fatal error
                 throw NoDataFoundException(
                     "No matching data found for bidding zone $biddingZone in period $periodStart - $periodEnd"
                 )
             }
-            // This is a real API error
+            // This is a real API error returned inside XML
             throw EntsoeApiException(
                 response.status.value,
-                "Failed to fetch data from ENTSO-E: $xmlString"
+                "Failed to fetch data from ENTSO-E: $trimmed"
             )
         }
 
         return xmlMapper.readValue(
-            xmlString,
+            trimmed,
             PublicationMarketDocument::class.java
         )
     }
