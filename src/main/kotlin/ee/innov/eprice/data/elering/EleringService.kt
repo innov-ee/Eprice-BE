@@ -4,16 +4,24 @@ import ee.innov.eprice.domain.model.EleringApiException
 import ee.innov.eprice.domain.model.NoDataFoundException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.isSuccess
+import io.ktor.serialization.kotlinx.json.json
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 class EleringService(
-    private val client: HttpClient,
+    baseClient: HttpClient,
 ) {
+    private val client = baseClient.config {
+        install(ContentNegotiation) {
+            json()
+        }
+    }
+
     // Elering API uses ISO 8601 format (UTC)
     private val formatter = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC)
 

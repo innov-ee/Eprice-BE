@@ -12,7 +12,6 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.api.createClientPlugin
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
 import io.ktor.client.request.get
@@ -20,7 +19,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
-import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteReadChannel
@@ -457,9 +455,6 @@ class ApplicationTest {
                             monitor.incrementOutgoing(request.url.host)
                         }
                     })
-                    install(ContentNegotiation) {
-                        json() // For EleringService
-                    }
                 }
             } // Override the real HttpClient
             single(qualifier = named("entsoeApiKey")) { "TEST_KEY" }
