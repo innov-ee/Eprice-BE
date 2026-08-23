@@ -8,7 +8,6 @@
 - Figure out the best way to handle time. (tiemstamp, bespoke class, zones, etc)
 - Figure out api contract, e.g sending double values or strings or smth else insstead?
 - Implement proper logger
-- Consider single endpoint that provides all/most of the data app needs.
 - Pass proper coroutine scopes
 - Ensure coroutine CancellationExceptions are not swallowed
 

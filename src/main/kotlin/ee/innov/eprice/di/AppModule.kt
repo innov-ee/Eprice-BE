@@ -16,6 +16,7 @@ import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetPriceStatisticsUseCase
+import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
@@ -132,6 +133,12 @@ val appModule = module {
 
     factory {
         GetPriceStatisticsUseCase(
+            priceStatsRepository = get()
+        )
+    }
+
+    factory {
+        GetPriceSummaryUseCase(
             priceStatsRepository = get()
         )
     }

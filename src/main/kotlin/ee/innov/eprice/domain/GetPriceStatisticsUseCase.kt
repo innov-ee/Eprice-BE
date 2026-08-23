@@ -1,5 +1,6 @@
 package ee.innov.eprice.domain
 
+import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.PriceStatsQuery
 import ee.innov.eprice.domain.model.PriceStatsQuery.NamedRange
@@ -28,7 +29,61 @@ class GetPriceStatisticsUseCase(
         val minPrice: Double,
         val maxPrice: Double,
         val averagePrice: Double
-    )
+    ) {
+        companion object {
+            /**
+             * Aggregates a collection of [DailyStatEntry] into [PriceStatistics].
+             * Returns null if [dailyStats] is empty.
+             */
+            fun compute(
+                countryCode: String,
+                startDate: LocalDate,
+                endDate: LocalDate,
+                daysRequested: Int,
+                dailyStats: Collection<DailyStatEntry>
+            ): PriceStatistics? {
+                if (dailyStats.isEmpty()) return null
+
+                val minPrice = dailyStats.minOf { it.min }
+                val maxPrice = dailyStats.maxOf { it.max }
+                val totalSum = dailyStats.sumOf { it.sum }
+                val totalCount = dailyStats.sumOf { it.count }
+                val averagePrice = if (totalCount > 0) totalSum / totalCount else 0.0
+
+                return PriceStatistics(
+                    countryCode = countryCode.uppercase(),
+                    startDate = startDate.toString(),
+                    endDate = endDate.toString(),
+                    daysRequested = daysRequested,
+                    daysCalculated = dailyStats.size,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    averagePrice = averagePrice
+                )
+            }
+
+            /**
+             * Aggregates a date-keyed map of [DailyStatEntry] for the given [startDate]..[endDate] slice.
+             * Returns null if no entries fall within the date range.
+             */
+            fun compute(
+                countryCode: String,
+                statsMap: Map<LocalDate, DailyStatEntry>,
+                startDate: LocalDate,
+                endDate: LocalDate,
+                daysRequested: Int
+            ): PriceStatistics? {
+                val slice = statsMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }.values
+                return compute(
+                    countryCode = countryCode,
+                    startDate = startDate,
+                    endDate = endDate,
+                    daysRequested = daysRequested,
+                    dailyStats = slice
+                )
+            }
+        }
+    }
 
     /**
      * Executes price statistics calculation based on domain [PriceStatsQuery].
@@ -92,30 +147,17 @@ class GetPriceStatisticsUseCase(
         val dailyStatsResult = priceStatsRepository.getDailyStats(countryCode, startDate, endDate)
         val allStats = dailyStatsResult.getOrElse { return Result.failure(it) }.values
 
-        if (allStats.isEmpty()) {
-            return Result.failure(
-                NoDataFoundException("No price data found for $countryCode between $startDate and $endDate.")
-            )
-        }
-
-        val minPrice = allStats.minOf { it.min }
-        val maxPrice = allStats.maxOf { it.max }
-        val totalSum = allStats.sumOf { it.sum }
-        val totalCount = allStats.sumOf { it.count }
-        val averagePrice = if (totalCount > 0) totalSum / totalCount else 0.0
-
-        return Result.success(
-            PriceStatistics(
-                countryCode = countryCode.uppercase(),
-                startDate = startDate.toString(),
-                endDate = endDate.toString(),
-                daysRequested = daysRequested,
-                daysCalculated = allStats.size,
-                minPrice = minPrice,
-                maxPrice = maxPrice,
-                averagePrice = averagePrice
-            )
+        val stats = PriceStatistics.compute(
+            countryCode = countryCode,
+            startDate = startDate,
+            endDate = endDate,
+            daysRequested = daysRequested,
+            dailyStats = allStats
+        ) ?: return Result.failure(
+            NoDataFoundException("No price data found for $countryCode between $startDate and $endDate.")
         )
+
+        return Result.success(stats)
     }
 
     /**

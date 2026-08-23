@@ -282,6 +282,28 @@ class ApplicationTest {
         )
     }
 
+    @Test
+    fun `GET prices stats summary should return 200 OK with combined summary`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/api/prices/EE/stats/summary")
+
+                assertEquals(HttpStatusCode.OK, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""countryCode":"EE""""))
+                assertTrue(body.contains(""""rolling":{"""))
+                assertTrue(body.contains(""""yesterday":{"""))
+                assertTrue(body.contains(""""today":{"""))
+            }
+        )
+    }
+
 
     private fun createMockEngineHandler(
         eleringContent: String,
