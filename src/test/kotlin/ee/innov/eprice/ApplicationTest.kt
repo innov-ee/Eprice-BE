@@ -304,6 +304,69 @@ class ApplicationTest {
         )
     }
 
+    @Test
+    fun `GET monitor html should return 200 OK with html content`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/monitor.html")
+
+                assertEquals(HttpStatusCode.OK, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains("<title>EPrice Service Monitor & API Explorer</title>"))
+                assertTrue(body.contains("Refresh Monitor"))
+            }
+        )
+    }
+
+    @Test
+    fun `GET api meta routes should return 200 OK with route metadata catalog`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/api/meta/routes")
+
+                assertEquals(HttpStatusCode.OK, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""path":"/monitor""""))
+                assertTrue(body.contains(""""path":"/api/prices/{countryCode?}""""))
+                assertTrue(body.contains(""""category":"Monitoring & Diagnostics""""))
+                assertTrue(body.contains(""""samples":[{"""))
+            }
+        )
+    }
+
+    @Test
+    fun `GET monitor should return 200 OK with service stats`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/monitor")
+
+                assertEquals(HttpStatusCode.OK, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""uptime":"""))
+                assertTrue(body.contains(""""totalIncomingRequests":"""))
+                assertTrue(body.contains(""""totalOutgoingRequests":"""))
+            }
+        )
+    }
+
 
     private fun createMockEngineHandler(
         eleringContent: String,

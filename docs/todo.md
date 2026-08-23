@@ -11,6 +11,9 @@
 - Pass proper coroutine scopes
 - Ensure coroutine CancellationExceptions are not swallowed
 
+# Nits
+- Logging sometimes happens twice per request: in UseCase and Routes
+
 # Pre live
 - Remove GET endpoint for clearing cache
 - Make API only accessible to the app.

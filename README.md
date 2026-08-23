@@ -10,8 +10,9 @@
 
 ### Verify
 - unit tests: `./gradlew test`
+- monitor dashboard: http://localhost:8080/monitor.html
+- raw monitor status: http://localhost:8080/monitor
 - prices (EE): http://localhost:8080/api/prices
-- status: http://localhost:8080/monitor
 - price stats: http://localhost:8080/api/prices/EE/stats 
 - yesterday stats: http://localhost:8080/api/prices/EE/stats?range=yesterday
 
