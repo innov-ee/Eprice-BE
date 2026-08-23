@@ -2,6 +2,7 @@ package ee.innov.eprice.domain
 
 import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.domain.model.NoDataFoundException
+import ee.innov.eprice.monitoring.ServiceMonitor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -12,7 +13,8 @@ import java.time.LocalDate
 class GetRollingAveragePriceUseCase(
     private val energyPriceRepository: EnergyPriceRepository,
     private val dailyAveragePriceCache: DailyAveragePriceCache,
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    private val monitor: ServiceMonitor? = null
 ) {
 
     /**
@@ -45,6 +47,9 @@ class GetRollingAveragePriceUseCase(
 
         // 3. Determine which dates we are missing
         val missingDates = datesInRange.filter { !cachedAverages.containsKey(it) }
+
+        monitor?.recordCacheHit(cachedAverages.size.toLong())
+        monitor?.recordCacheMiss(missingDates.size.toLong())
 
         val fetchedAverages = mutableMapOf<LocalDate, Double>()
 

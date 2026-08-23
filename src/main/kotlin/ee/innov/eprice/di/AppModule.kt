@@ -50,8 +50,8 @@ val appModule = module {
 
 
             install(createClientPlugin("OutgoingMonitor") {
-                onRequest { _, _ ->
-                    monitor.incrementOutgoing()
+                onRequest { request, _ ->
+                    monitor.incrementOutgoing(request.url.host)
                 }
             })
 
@@ -111,14 +111,16 @@ val appModule = module {
         EnergyPriceRepositoryImpl(
             entsoeService = get(),
             eleringService = get(),
-            cache = get()
+            cache = get(),
+            monitor = get()
         )
     }
 
     single<PriceStatsRepository> {
         PriceStatsRepositoryImpl(
             energyPriceRepository = get(),
-            dailyStatsCache = get()
+            dailyStatsCache = get(),
+            monitor = get()
         )
     }
 
@@ -127,7 +129,8 @@ val appModule = module {
     factory {
         GetRollingAveragePriceUseCase(
             energyPriceRepository = get(),
-            dailyAveragePriceCache = get()
+            dailyAveragePriceCache = get(),
+            monitor = get()
         )
     }
 

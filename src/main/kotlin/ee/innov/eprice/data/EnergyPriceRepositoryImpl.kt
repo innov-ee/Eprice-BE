@@ -10,13 +10,15 @@ import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.toApiError
+import ee.innov.eprice.monitoring.ServiceMonitor
 import org.slf4j.LoggerFactory
 import java.time.Instant
 
 class EnergyPriceRepositoryImpl(
     private val entsoeService: EntsoeService,
     private val eleringService: EleringService,
-    private val cache: PriceCache
+    private val cache: PriceCache,
+    private val monitor: ServiceMonitor? = null
 ) : EnergyPriceRepository {
 
     private val logger = LoggerFactory.getLogger(EnergyPriceRepositoryImpl::class.java)
@@ -31,7 +33,14 @@ class EnergyPriceRepositoryImpl(
 
         val cachedPrices = cache.get(cacheKey)
         if (cachedPrices != null) {
+            if (cacheResults) {
+                monitor?.recordCacheHit()
+            }
             return Result.success(cachedPrices)
+        }
+
+        if (cacheResults) {
+            monitor?.recordCacheMiss()
         }
 
         val networkResult = fetchFromNetwork(countryCode, start, end)

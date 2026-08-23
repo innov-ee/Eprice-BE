@@ -4,6 +4,7 @@ import ee.innov.eprice.domain.CountryZoneProvider
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.domain.model.DailyStatEntry
+import ee.innov.eprice.monitoring.ServiceMonitor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -12,7 +13,8 @@ import java.time.temporal.ChronoUnit
 
 class PriceStatsRepositoryImpl(
     private val energyPriceRepository: EnergyPriceRepository,
-    private val dailyStatsCache: DailyStatsCache
+    private val dailyStatsCache: DailyStatsCache,
+    private val monitor: ServiceMonitor? = null
 ) : PriceStatsRepository {
 
     override suspend fun getDailyStats(
@@ -25,6 +27,9 @@ class PriceStatsRepositoryImpl(
 
         val cachedStats = dailyStatsCache.getRange(countryCode, startDate, endDate)
         val missingDates = datesInRange.filter { !cachedStats.containsKey(it) }
+
+        monitor?.recordCacheHit(cachedStats.size.toLong())
+        monitor?.recordCacheMiss(missingDates.size.toLong())
 
         if (missingDates.isEmpty()) {
             return Result.success(cachedStats)
