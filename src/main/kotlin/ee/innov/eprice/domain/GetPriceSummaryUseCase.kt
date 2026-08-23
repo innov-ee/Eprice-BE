@@ -31,23 +31,14 @@ class GetPriceSummaryUseCase(
         val today = LocalDate.now(clock.withZone(zoneId))
         val yesterday = today.minusDays(1)
         val tomorrow = today.plusDays(1)
+        val rollingStart = yesterday.minusDays(rollingDays.toLong() - 1)
 
-        // Request a wide enough range to cover rolling period + yesterday/today/tomorrow
-        val earliestStartDate = minOf(yesterday, today.minusDays(rollingDays.toLong()))
-        val dailyStatsResult = priceStatsRepository.getDailyStats(ucCountry, earliestStartDate, tomorrow)
-        val statsMap = dailyStatsResult.getOrElse { return Result.failure(it) }
+        val statsMap = priceStatsRepository.getDailyStats(ucCountry, rollingStart, tomorrow)
+            .getOrElse { return Result.failure(it) }
 
-        // 1. Check if tomorrow data is available
-        val tomorrowEntry = statsMap[tomorrow]
-        val hasTomorrow = tomorrowEntry != null && tomorrowEntry.count > 0
-
-        // 2. Determine rolling window end & start dates (freshest available window)
-        val rollingEnd = if (hasTomorrow) tomorrow else today
-        val rollingStart = rollingEnd.minusDays(rollingDays.toLong() - 1)
-
-        val rollingStats = PriceStatistics.compute(ucCountry, statsMap, rollingStart, rollingEnd, rollingDays)
+        val rollingStats = PriceStatistics.compute(ucCountry, statsMap, rollingStart, yesterday, rollingDays)
             ?: return Result.failure(
-                NoDataFoundException("No rolling price data found for $ucCountry between $rollingStart and $rollingEnd.")
+                NoDataFoundException("No rolling price data found for $ucCountry between $rollingStart and $yesterday.")
             )
 
         val yesterdayStats = PriceStatistics.compute(ucCountry, statsMap, yesterday, yesterday, 1)
@@ -59,6 +50,10 @@ class GetPriceSummaryUseCase(
             ?: return Result.failure(
                 NoDataFoundException("No price data found for $ucCountry for today ($today).")
             )
+
+        // Check if tomorrow data is available
+        val tomorrowEntry = statsMap[tomorrow]
+        val hasTomorrow = tomorrowEntry != null && tomorrowEntry.count > 0
 
         val tomorrowStats = if (hasTomorrow) {
             PriceStatistics.compute(ucCountry, statsMap, tomorrow, tomorrow, 1)
