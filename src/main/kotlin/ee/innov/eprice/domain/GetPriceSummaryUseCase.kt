@@ -1,6 +1,6 @@
 package ee.innov.eprice.domain
 
-import ee.innov.eprice.domain.model.DailyStatEntry
+import ee.innov.eprice.domain.GetPriceStatisticsUseCase.PriceStatistics
 import ee.innov.eprice.domain.model.NoDataFoundException
 import kotlinx.serialization.Serializable
 import java.time.Clock
@@ -9,10 +9,10 @@ import java.time.LocalDate
 @Serializable
 data class PriceSummaryStatistics(
     val countryCode: String,
-    val rolling: GetPriceStatisticsUseCase.PriceStatistics,
-    val yesterday: GetPriceStatisticsUseCase.PriceStatistics,
-    val today: GetPriceStatisticsUseCase.PriceStatistics,
-    val tomorrow: GetPriceStatisticsUseCase.PriceStatistics? = null
+    val rolling: PriceStatistics,
+    val yesterday: PriceStatistics,
+    val today: PriceStatistics,
+    val tomorrow: PriceStatistics? = null
 )
 
 class GetPriceSummaryUseCase(
@@ -45,23 +45,23 @@ class GetPriceSummaryUseCase(
         val rollingEnd = if (hasTomorrow) tomorrow else today
         val rollingStart = rollingEnd.minusDays(rollingDays.toLong() - 1)
 
-        val rollingStats = computeStats(ucCountry, statsMap, rollingStart, rollingEnd, rollingDays)
+        val rollingStats = PriceStatistics.compute(ucCountry, statsMap, rollingStart, rollingEnd, rollingDays)
             ?: return Result.failure(
                 NoDataFoundException("No rolling price data found for $ucCountry between $rollingStart and $rollingEnd.")
             )
 
-        val yesterdayStats = computeStats(ucCountry, statsMap, yesterday, yesterday, 1)
+        val yesterdayStats = PriceStatistics.compute(ucCountry, statsMap, yesterday, yesterday, 1)
             ?: return Result.failure(
                 NoDataFoundException("No price data found for $ucCountry for yesterday ($yesterday).")
             )
 
-        val todayStats = computeStats(ucCountry, statsMap, today, today, 1)
+        val todayStats = PriceStatistics.compute(ucCountry, statsMap, today, today, 1)
             ?: return Result.failure(
                 NoDataFoundException("No price data found for $ucCountry for today ($today).")
             )
 
         val tomorrowStats = if (hasTomorrow) {
-            computeStats(ucCountry, statsMap, tomorrow, tomorrow, 1)
+            PriceStatistics.compute(ucCountry, statsMap, tomorrow, tomorrow, 1)
         } else null
 
         return Result.success(
@@ -72,34 +72,6 @@ class GetPriceSummaryUseCase(
                 today = todayStats,
                 tomorrow = tomorrowStats
             )
-        )
-    }
-
-    private fun computeStats(
-        countryCode: String,
-        statsMap: Map<LocalDate, DailyStatEntry>,
-        startDate: LocalDate,
-        endDate: LocalDate,
-        daysRequested: Int
-    ): GetPriceStatisticsUseCase.PriceStatistics? {
-        val slice = statsMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }.values
-        if (slice.isEmpty()) return null
-
-        val minPrice = slice.minOf { it.min }
-        val maxPrice = slice.maxOf { it.max }
-        val totalSum = slice.sumOf { it.sum }
-        val totalCount = slice.sumOf { it.count }
-        val averagePrice = if (totalCount > 0) totalSum / totalCount else 0.0
-
-        return GetPriceStatisticsUseCase.PriceStatistics(
-            countryCode = countryCode,
-            startDate = startDate.toString(),
-            endDate = endDate.toString(),
-            daysRequested = daysRequested,
-            daysCalculated = slice.size,
-            minPrice = minPrice,
-            maxPrice = maxPrice,
-            averagePrice = averagePrice
         )
     }
 }

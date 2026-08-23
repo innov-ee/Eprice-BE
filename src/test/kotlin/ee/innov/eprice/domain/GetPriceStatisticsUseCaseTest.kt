@@ -209,4 +209,31 @@ class GetPriceStatisticsUseCaseTest {
         assertEquals("2026-08-23", stats.startDate)
         assertEquals("2026-08-23", stats.endDate)
     }
+
+    @Test
+    fun `PriceStatistics compute returns null for empty collection or empty map slice`() {
+        val start = LocalDate.of(2026, 8, 10)
+        val end = LocalDate.of(2026, 8, 12)
+
+        val emptyCollectionResult = GetPriceStatisticsUseCase.PriceStatistics.compute(
+            countryCode = "EE",
+            startDate = start,
+            endDate = end,
+            daysRequested = 3,
+            dailyStats = emptyList()
+        )
+        org.junit.jupiter.api.Assertions.assertNull(emptyCollectionResult)
+
+        val outOfRangeMap = mapOf(
+            LocalDate.of(2026, 8, 15) to DailyStatEntry(min = 0.1, max = 0.2, avg = 0.15, sum = 3.6, count = 24)
+        )
+        val emptyMapResult = GetPriceStatisticsUseCase.PriceStatistics.compute(
+            countryCode = "EE",
+            statsMap = outOfRangeMap,
+            startDate = start,
+            endDate = end,
+            daysRequested = 3
+        )
+        org.junit.jupiter.api.Assertions.assertNull(emptyMapResult)
+    }
 }
