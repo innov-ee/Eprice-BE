@@ -46,8 +46,7 @@ class EntsoeService(
         val periodEnd = formatter.format(end)
 
         val response: HttpResponse = client.get("https://web-api.tp.entsoe.eu/api") {
-            // Force XML: the shared HttpClient's ContentNegotiation plugin (for Elering) would
-            // otherwise default to Accept: application/json, causing ENTSO-E to return JSON.
+            // Explicitly request XML payload from ENTSO-E
             headers {
                 append(HttpHeaders.Accept, "application/xml")
             }
