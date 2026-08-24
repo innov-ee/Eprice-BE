@@ -2,6 +2,7 @@ package ee.innov.eprice.domain
 
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.DomainEnergyPrice
+import ee.innov.eprice.domain.model.isFullDay
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -42,7 +43,7 @@ class CountryZoneProviderTest {
     }
 
     @Test
-    fun `isFullDayData accepts complete 24-hour data and rejects partial 1-2 hours data`() {
+    fun `isFullDay accepts complete 24-hour data and rejects partial 1-2 hours data`() {
         val date = LocalDate.of(2026, 8, 23)
         val dayStart = date.atStartOfDay(tallinnZone).toInstant()
 
@@ -50,20 +51,20 @@ class CountryZoneProviderTest {
         val fullDayPrices = (0 until 24).map { hour ->
             DomainEnergyPrice(dayStart.plusSeconds(hour * 3600L), 0.10)
         }
-        assertTrue(CountryZoneProvider.isFullDayData(fullDayPrices, date, tallinnZone))
+        assertTrue(fullDayPrices.isFullDay(date, tallinnZone))
 
         // Partial 2-hour dataset (e.g. from tomorrow with only UTC offset available)
         val partialPrices = (0 until 2).map { hour ->
             DomainEnergyPrice(dayStart.plusSeconds(hour * 3600L), 0.10)
         }
-        assertFalse(CountryZoneProvider.isFullDayData(partialPrices, date, tallinnZone))
+        assertFalse(partialPrices.isFullDay(date, tallinnZone))
 
         // Empty list
-        assertFalse(CountryZoneProvider.isFullDayData(emptyList(), date, tallinnZone))
+        assertFalse(emptyList<DomainEnergyPrice>().isFullDay(date, tallinnZone))
     }
 
     @Test
-    fun `isFullDayData works with 15-minute resolution data`() {
+    fun `isFullDay works with 15-minute resolution data`() {
         val date = LocalDate.of(2026, 8, 23)
         val dayStart = date.atStartOfDay(tallinnZone).toInstant()
 
@@ -71,17 +72,17 @@ class CountryZoneProviderTest {
         val fullDay15m = (0 until 96).map { interval ->
             DomainEnergyPrice(dayStart.plusSeconds(interval * 900L), 0.10)
         }
-        assertTrue(CountryZoneProvider.isFullDayData(fullDay15m, date, tallinnZone))
+        assertTrue(fullDay15m.isFullDay(date, tallinnZone))
 
         // Incomplete 15m dataset (e.g. 2 hours = 8 intervals)
         val partial15m = (0 until 8).map { interval ->
             DomainEnergyPrice(dayStart.plusSeconds(interval * 900L), 0.10)
         }
-        assertFalse(CountryZoneProvider.isFullDayData(partial15m, date, tallinnZone))
+        assertFalse(partial15m.isFullDay(date, tallinnZone))
     }
 
     @Test
-    fun `isFullDayEntry validates daily stat entry counts against expected hours`() {
+    fun `DailyStatEntry isFullDay validates daily stat entry counts against expected hours`() {
         val standardDate = LocalDate.of(2026, 8, 23)
         val springDst = LocalDate.of(2026, 3, 29) // 23h
         val autumnDst = LocalDate.of(2026, 10, 25) // 25h
@@ -90,14 +91,14 @@ class CountryZoneProviderTest {
         val partial2Entry = DailyStatEntry(0.1, 0.2, 0.15, 0.3, 2)
         val entry23 = DailyStatEntry(0.1, 0.2, 0.15, 3.45, 23)
 
-        assertTrue(CountryZoneProvider.isFullDayEntry(full24Entry, standardDate, tallinnZone))
-        assertFalse(CountryZoneProvider.isFullDayEntry(partial2Entry, standardDate, tallinnZone))
+        assertTrue(full24Entry.isFullDay(standardDate, tallinnZone))
+        assertFalse(partial2Entry.isFullDay(standardDate, tallinnZone))
 
         // On 23h spring day, 23 count is full day
-        assertTrue(CountryZoneProvider.isFullDayEntry(entry23, springDst, tallinnZone))
+        assertTrue(entry23.isFullDay(springDst, tallinnZone))
         // On 24h standard day, 23 count is not full day
-        assertFalse(CountryZoneProvider.isFullDayEntry(entry23, standardDate, tallinnZone))
+        assertFalse(entry23.isFullDay(standardDate, tallinnZone))
         // On 25h autumn day, 24 count is not full day
-        assertFalse(CountryZoneProvider.isFullDayEntry(full24Entry, autumnDst, tallinnZone))
+        assertFalse(full24Entry.isFullDay(autumnDst, tallinnZone))
     }
 }

@@ -146,7 +146,7 @@ class GetPriceStatisticsUseCase(
 
         val dailyStatsResult = priceStatsRepository.getDailyStats(countryCode, startDate, endDate)
         val statsMap = dailyStatsResult.getOrElse { return Result.failure(it) }
-            .filter { (date, entry) -> CountryZoneProvider.isFullDayEntry(entry, date, zoneId) }
+            .filter { (date, entry) -> entry.isFullDay(date, zoneId) }
         val allStats = statsMap.values
 
         val stats = PriceStatistics.compute(

@@ -4,6 +4,7 @@ import ee.innov.eprice.domain.CountryZoneProvider
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.domain.model.DailyStatEntry
+import ee.innov.eprice.domain.model.isFullDay
 import ee.innov.eprice.monitoring.ServiceMonitor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -28,7 +29,7 @@ class PriceStatsRepositoryImpl(
         val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
 
         val cachedStats = dailyStatsCache.getRange(ucCountry, startDate, endDate)
-            .filter { (date, entry) -> CountryZoneProvider.isFullDayEntry(entry, date, zoneId) }
+            .filter { (date, entry) -> entry.isFullDay(date, zoneId) }
         val missingDates = datesInRange.filter { !cachedStats.containsKey(it) }
 
         monitor?.recordCacheHit(cachedStats.size.toLong())
@@ -68,7 +69,7 @@ class PriceStatsRepositoryImpl(
             cacheResults = false
         ).getOrNull()?.takeIf { it.isNotEmpty() } ?: return null
 
-        if (!CountryZoneProvider.isFullDayData(prices, date, zoneId)) {
+        if (!prices.isFullDay(date, zoneId)) {
             return null
         }
 

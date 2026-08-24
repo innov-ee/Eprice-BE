@@ -37,7 +37,7 @@ class GetPriceSummaryUseCase(
             .getOrElse { return Result.failure(it) }
 
         val statsMap = rawStatsMap.filter { (date, entry) ->
-            CountryZoneProvider.isFullDayEntry(entry, date, zoneId)
+            entry.isFullDay(date, zoneId)
         }
 
         val rollingStats = PriceStatistics.compute(ucCountry, statsMap, rollingStart, yesterday, rollingDays)
@@ -57,7 +57,7 @@ class GetPriceSummaryUseCase(
 
         // Check if tomorrow data is available with full day data
         val tomorrowEntry = statsMap[tomorrow]
-        val hasTomorrow = tomorrowEntry != null && CountryZoneProvider.isFullDayEntry(tomorrowEntry, tomorrow, zoneId)
+        val hasTomorrow = tomorrowEntry != null && tomorrowEntry.isFullDay(tomorrow, zoneId)
 
         val tomorrowStats = if (hasTomorrow) {
             PriceStatistics.compute(ucCountry, statsMap, tomorrow, tomorrow, 1)
