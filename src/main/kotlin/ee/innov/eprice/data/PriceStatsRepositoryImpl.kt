@@ -22,10 +22,13 @@ class PriceStatsRepositoryImpl(
         startDate: LocalDate,
         endDate: LocalDate
     ): Result<Map<LocalDate, DailyStatEntry>> {
+        val ucCountry = countryCode.uppercase()
+        val zoneId = CountryZoneProvider.getZoneId(ucCountry)
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
         val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
 
-        val cachedStats = dailyStatsCache.getRange(countryCode, startDate, endDate)
+        val cachedStats = dailyStatsCache.getRange(ucCountry, startDate, endDate)
+            .filter { (date, entry) -> CountryZoneProvider.isFullDayEntry(entry, date, zoneId) }
         val missingDates = datesInRange.filter { !cachedStats.containsKey(it) }
 
         monitor?.recordCacheHit(cachedStats.size.toLong())
@@ -38,7 +41,7 @@ class PriceStatsRepositoryImpl(
         val fetchedStats = try {
             coroutineScope {
                 val deferredResults = missingDates.map { date ->
-                    async { fetchDailyStat(countryCode, date) }
+                    async { fetchDailyStat(ucCountry, date) }
                 }
                 deferredResults.awaitAll().filterNotNull().toMap()
             }
@@ -47,7 +50,7 @@ class PriceStatsRepositoryImpl(
         }
 
         if (fetchedStats.isNotEmpty()) {
-            dailyStatsCache.putBatch(countryCode, fetchedStats)
+            dailyStatsCache.putBatch(ucCountry, fetchedStats)
         }
 
         return Result.success(cachedStats + fetchedStats)
@@ -64,6 +67,10 @@ class PriceStatsRepositoryImpl(
             end = dayEnd,
             cacheResults = false
         ).getOrNull()?.takeIf { it.isNotEmpty() } ?: return null
+
+        if (!CountryZoneProvider.isFullDayData(prices, date, zoneId)) {
+            return null
+        }
 
         val pricesList = prices.map { it.pricePerKWh }
         val entry = DailyStatEntry(

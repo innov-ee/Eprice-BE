@@ -76,13 +76,13 @@ class GetRollingAveragePriceUseCase(
 
 
                             result.getOrNull()?.let { prices ->
-                                if (prices.isNotEmpty()) {
+                                if (CountryZoneProvider.isFullDayData(prices, date, zoneId)) {
                                     val dailyAvg = prices.map { it.pricePerKWh }.average()
                                     // Store in our persistent daily cache
                                     dailyAveragePriceCache.put(countryCode, date, dailyAvg)
                                     date to dailyAvg // Return pair for map
                                 } else {
-                                    null // No data found for this day
+                                    null // Incomplete or no data found for this day
                                 }
                             }
                             // If result.getOrNull() is null (a failure), this will also return null

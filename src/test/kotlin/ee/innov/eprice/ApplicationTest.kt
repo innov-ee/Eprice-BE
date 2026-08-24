@@ -396,6 +396,15 @@ class ApplicationTest {
     }
 
 
+    private fun generateEleringDailyJson(startInstant: java.time.Instant, count: Int = 24): String {
+        val points = (0 until count).joinToString(",") { i ->
+            val timestamp = startInstant.epochSecond + (i * 3600)
+            val price = if (i % 2 == 0) 150.0 else 120.0
+            """{"timestamp": $timestamp, "price": $price}"""
+        }
+        return """{"success": true, "data": {"EE": [$points]}}"""
+    }
+
     private fun createMockEngineHandler(
         eleringContent: String,
         eleringStatus: HttpStatusCode,
@@ -404,7 +413,29 @@ class ApplicationTest {
     ): suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData {
         return { request ->
             if (request.url.host.contains("elering")) {
-                mockJsonResponse(eleringContent, eleringStatus)
+                if (eleringStatus == HttpStatusCode.OK && eleringContent == mockEleringSuccessJson) {
+                    val startParam = request.url.parameters["start"]
+                    val endParam = request.url.parameters["end"]
+                    if (startParam != null && endParam != null) {
+                        try {
+                            val startInstant = java.time.Instant.parse(startParam)
+                            val endInstant = java.time.Instant.parse(endParam)
+                            val durationSeconds = java.time.Duration.between(startInstant, endInstant).seconds
+                            if (durationSeconds <= 86400) {
+                                val content = generateEleringDailyJson(startInstant)
+                                mockJsonResponse(content, eleringStatus)
+                            } else {
+                                mockJsonResponse(eleringContent, eleringStatus)
+                            }
+                        } catch (_: Exception) {
+                            mockJsonResponse(eleringContent, eleringStatus)
+                        }
+                    } else {
+                        mockJsonResponse(eleringContent, eleringStatus)
+                    }
+                } else {
+                    mockJsonResponse(eleringContent, eleringStatus)
+                }
             } else {
                 mockXmlResponse(entsoeContent, entsoeStatus)
             }

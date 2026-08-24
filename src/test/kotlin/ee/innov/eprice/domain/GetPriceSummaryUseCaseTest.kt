@@ -176,4 +176,57 @@ class GetPriceSummaryUseCaseTest {
         assertEquals("2026-08-18", summary.rolling.startDate)
         assertEquals("2026-08-22", summary.rolling.endDate)
     }
+
+    @Test
+    fun `execute when tomorrow has only partial 1-2 hours data returns null for tomorrow`() = runBlocking {
+        // Today is 2026-08-22, tomorrow 2026-08-23 only has 2 hours of data (e.g. count = 2)
+        repo.defaultEntryProvider = { date ->
+            if (date == LocalDate.of(2026, 8, 23)) {
+                DailyStatEntry(min = 0.10, max = 0.12, avg = 0.11, sum = 0.22, count = 2)
+            } else {
+                DailyStatEntry(min = 0.10, max = 0.30, avg = 0.20, sum = 4.80, count = 24)
+            }
+        }
+
+        val result = useCase.execute("EE")
+        assertTrue(result.isSuccess)
+
+        val summary = result.getOrThrow()
+        // Tomorrow must be null because it only had 2 hours instead of 24
+        assertNull(summary.tomorrow)
+        assertEquals("2026-08-21", summary.yesterday.startDate)
+        assertEquals("2026-08-22", summary.today.startDate)
+    }
+
+    @Test
+    fun `execute when today has only partial data returns failure`() = runBlocking {
+        // Today has only 3 hours of data
+        repo.defaultEntryProvider = { date ->
+            if (date == LocalDate.of(2026, 8, 22)) {
+                DailyStatEntry(min = 0.10, max = 0.15, avg = 0.12, sum = 0.36, count = 3)
+            } else {
+                DailyStatEntry(min = 0.10, max = 0.30, avg = 0.20, sum = 4.80, count = 24)
+            }
+        }
+
+        val result = useCase.execute("EE")
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is NoDataFoundException)
+    }
+
+    @Test
+    fun `execute when yesterday has only partial data returns failure`() = runBlocking {
+        // Yesterday has only 1 hour of data
+        repo.defaultEntryProvider = { date ->
+            if (date == LocalDate.of(2026, 8, 21)) {
+                DailyStatEntry(min = 0.10, max = 0.10, avg = 0.10, sum = 0.10, count = 1)
+            } else {
+                DailyStatEntry(min = 0.10, max = 0.30, avg = 0.20, sum = 4.80, count = 24)
+            }
+        }
+
+        val result = useCase.execute("EE")
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is NoDataFoundException)
+    }
 }
