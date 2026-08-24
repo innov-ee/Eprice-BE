@@ -13,7 +13,7 @@ interface PriceCache {
 
     fun get(key: String): List<DomainEnergyPrice>?
 
-    fun put(key: String, prices: List<DomainEnergyPrice>)
+    fun put(key: String, prices: List<DomainEnergyPrice>, isComplete: Boolean = false)
 
     fun clear()
 }
@@ -22,7 +22,7 @@ interface PriceCache {
 private data class CacheEntry(
     val data: List<DomainEnergyPrice>,
     @Serializable(with = InstantSerializer::class)
-    val expiryTime: Instant
+    val expiryTime: Instant? = null
 )
 
 /**
@@ -32,12 +32,11 @@ private data class CacheEntry(
 private typealias PriceCacheDto = Map<String, CacheEntry>
 
 class InMemoryPriceCache(
-    cacheFile: Path = Paths.get("eprice-cache.json")
+    cacheFile: Path = Paths.get("eprice-cache.json"),
+    private val cacheDuration: Duration = Duration.ofMinutes(60)
 ) : BaseFileCache(cacheFile), PriceCache {
 
     private val cache = ConcurrentHashMap<String, CacheEntry>()
-
-    private val cacheDuration = Duration.ofMinutes(60)
 
     init {
         loadCache()
@@ -45,16 +44,17 @@ class InMemoryPriceCache(
 
     override fun get(key: String): List<DomainEnergyPrice>? {
         val entry = cache[key] ?: return null
-        return if (Instant.now().isBefore(entry.expiryTime)) {
-            entry.data // Cache is valid
+        val expiry = entry.expiryTime
+        return if (expiry == null || Instant.now().isBefore(expiry)) {
+            entry.data // Cache is valid (indefinite if null, or not yet expired)
         } else {
             cache.remove(key) // Cache expired
             null
         }
     }
 
-    override fun put(key: String, prices: List<DomainEnergyPrice>) {
-        val expiry = Instant.now().plus(cacheDuration)
+    override fun put(key: String, prices: List<DomainEnergyPrice>, isComplete: Boolean) {
+        val expiry = if (isComplete) null else Instant.now().plus(cacheDuration)
         cache[key] = CacheEntry(prices, expiry)
         // Save to disk asynchronously. Pass a snapshot (.toMap()) for thread safety.
         saveToFileAsync<PriceCacheDto>(cache.toMap())
@@ -72,9 +72,9 @@ class InMemoryPriceCache(
     private fun loadCache() {
         val deserializedMap = loadFromFile<PriceCacheDto>() ?: return
 
-        // Filter out expired entries before loading into memory
+        // Keep indefinite entries (null expiryTime) and entries not yet expired
         val now = Instant.now()
-        val validEntries = deserializedMap.filterValues { it.expiryTime.isAfter(now) }
+        val validEntries = deserializedMap.filterValues { it.expiryTime == null || it.expiryTime.isAfter(now) }
 
         cache.putAll(validEntries)
         println("Loaded ${validEntries.size} valid cache entries from $cacheFile.")

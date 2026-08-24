@@ -2,6 +2,7 @@ package ee.innov.eprice.domain
 
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.DomainEnergyPrice
+import ee.innov.eprice.domain.model.isCompleteRange
 import ee.innov.eprice.domain.model.isFullDay
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -100,5 +101,51 @@ class CountryZoneProviderTest {
         assertFalse(entry23.isFullDay(standardDate, tallinnZone))
         // On 25h autumn day, 24 count is not full day
         assertFalse(full24Entry.isFullDay(autumnDst, tallinnZone))
+    }
+
+    @Test
+    fun `isFullDay rejects datasets with gaps or duplicate timestamps`() {
+        val date = LocalDate.of(2026, 8, 23)
+        val dayStart = date.atStartOfDay(tallinnZone).toInstant()
+
+        // 24 items, but hour 10 is duplicated and hour 11 is missing (gap!)
+        val gappedPrices = (0 until 24).map { hour ->
+            val actualHour = if (hour == 11) 10 else hour
+            DomainEnergyPrice(dayStart.plusSeconds(actualHour * 3600L), 0.10)
+        }
+        assertFalse(gappedPrices.isFullDay(date, tallinnZone))
+
+        // Starts shifted by 1 hour (01:00 to 00:00 next day)
+        val shiftedPrices = (1..24).map { hour ->
+            DomainEnergyPrice(dayStart.plusSeconds(hour * 3600L), 0.10)
+        }
+        assertFalse(shiftedPrices.isFullDay(date, tallinnZone))
+    }
+
+    @Test
+    fun `isCompleteRange validates all days in multi-day range`() {
+        val day1 = LocalDate.of(2026, 8, 22)
+        val day2 = LocalDate.of(2026, 8, 23)
+        val day3 = LocalDate.of(2026, 8, 24)
+
+        val start = day1.atStartOfDay(tallinnZone).toInstant()
+        val end = day3.plusDays(1).atStartOfDay(tallinnZone).minusSeconds(1).toInstant()
+
+        fun makeDayPrices(d: LocalDate) = (0 until 24).map { hour ->
+            DomainEnergyPrice(d.atStartOfDay(tallinnZone).toInstant().plusSeconds(hour * 3600L), 0.10)
+        }
+
+        val full3Days = makeDayPrices(day1) + makeDayPrices(day2) + makeDayPrices(day3)
+        assertTrue(full3Days.isCompleteRange(tallinnZone, start, end))
+
+        // If day 3 (tomorrow) is incomplete (only 2 hours available)
+        val partialDay3 = (0 until 2).map { hour ->
+            DomainEnergyPrice(day3.atStartOfDay(tallinnZone).toInstant().plusSeconds(hour * 3600L), 0.10)
+        }
+        val incomplete3Days = makeDayPrices(day1) + makeDayPrices(day2) + partialDay3
+        assertFalse(incomplete3Days.isCompleteRange(tallinnZone, start, end))
+
+        // Empty list
+        assertFalse(emptyList<DomainEnergyPrice>().isCompleteRange(tallinnZone, start, end))
     }
 }
