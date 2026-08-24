@@ -52,4 +52,32 @@ class GetRollingAveragePriceUseCaseTest {
         assertEquals(Instant.parse("2026-08-20T21:00:00Z"), repoSpy.requestedRanges[0].first)
         assertEquals(Instant.parse("2026-08-21T20:59:59Z"), repoSpy.requestedRanges[0].second)
     }
+
+    @Test
+    fun `execute ignores days with partial data when computing rolling average`() = runBlocking {
+        val cache = ee.innov.eprice.test.InMemoryDailyAveragePriceCache()
+        val partialRepo = object : EnergyPriceRepository {
+            override suspend fun getPrices(
+                countryCode: String,
+                start: Instant,
+                end: Instant,
+                cacheResults: Boolean
+            ): Result<List<DomainEnergyPrice>> {
+                // Return only 2 hours
+                return Result.success(
+                    listOf(
+                        DomainEnergyPrice(start, 0.10),
+                        DomainEnergyPrice(start.plusSeconds(3600), 0.20)
+                    )
+                )
+            }
+        }
+
+        val clock = Clock.fixed(Instant.parse("2026-08-22T10:00:00Z"), ZoneOffset.UTC)
+        val useCase = GetRollingAveragePriceUseCase(partialRepo, cache, clock)
+
+        val result = useCase.execute("EE", days = 1)
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is ee.innov.eprice.domain.model.NoDataFoundException)
+    }
 }

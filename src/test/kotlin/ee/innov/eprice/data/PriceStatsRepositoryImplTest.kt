@@ -107,4 +107,54 @@ class PriceStatsRepositoryImplTest {
         assertEquals(Instant.parse("2026-01-14T22:00:00Z"), winterStart)
         assertEquals(Instant.parse("2026-01-15T21:59:59Z"), winterEnd)
     }
+
+    @Test
+    fun `fetchDailyStat ignores partial day with only 1-2 hours and does not cache it`() = runBlocking {
+        val cache = InMemoryDailyStatsCache()
+        val customRepo = object : EnergyPriceRepository {
+            override suspend fun getPrices(
+                countryCode: String,
+                start: Instant,
+                end: Instant,
+                cacheResults: Boolean
+            ): Result<List<DomainEnergyPrice>> {
+                // Return only 2 hours
+                val partialPrices = listOf(
+                    DomainEnergyPrice(start, 0.10),
+                    DomainEnergyPrice(start.plusSeconds(3600), 0.12)
+                )
+                return Result.success(partialPrices)
+            }
+        }
+
+        val statsRepo = PriceStatsRepositoryImpl(customRepo, cache)
+        val testDate = LocalDate.of(2026, 8, 23)
+
+        val result = statsRepo.getDailyStats("EE", testDate, testDate)
+        assertTrue(result.isSuccess)
+        val map = result.getOrThrow()
+        // Map should be empty because partial day is rejected
+        assertTrue(map.isEmpty())
+        // Cache should not have cached the partial day
+        assertTrue(cache.getRange("EE", testDate, testDate).isEmpty())
+    }
+
+    @Test
+    fun `getDailyStats filters out invalid partial entries from cache and refetches`() = runBlocking {
+        val cache = InMemoryDailyStatsCache()
+        val priceRepo = CountingPriceRepositoryFake()
+        val statsRepo = PriceStatsRepositoryImpl(priceRepo, cache)
+
+        val testDate = LocalDate.of(2026, 8, 23)
+        // Corrupt cache with a partial 2-hour entry
+        cache.put("EE", testDate, DailyStatEntry(min = 0.10, max = 0.12, avg = 0.11, sum = 0.22, count = 2))
+
+        val result = statsRepo.getDailyStats("EE", testDate, testDate)
+        assertTrue(result.isSuccess)
+        val map = result.getOrThrow()
+        assertEquals(1, map.size)
+        // Repositories fetched full 24-hour data
+        assertEquals(24, map[testDate]?.count)
+        assertEquals(1, priceRepo.callCount)
+    }
 }

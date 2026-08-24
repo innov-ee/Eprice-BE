@@ -2,6 +2,7 @@ package ee.innov.eprice.domain
 
 import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.domain.model.NoDataFoundException
+import ee.innov.eprice.domain.model.isFullDay
 import ee.innov.eprice.monitoring.ServiceMonitor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -76,13 +77,13 @@ class GetRollingAveragePriceUseCase(
 
 
                             result.getOrNull()?.let { prices ->
-                                if (prices.isNotEmpty()) {
+                                if (prices.isFullDay(date, zoneId)) {
                                     val dailyAvg = prices.map { it.pricePerKWh }.average()
                                     // Store in our persistent daily cache
                                     dailyAveragePriceCache.put(countryCode, date, dailyAvg)
                                     date to dailyAvg // Return pair for map
                                 } else {
-                                    null // No data found for this day
+                                    null // Incomplete or no data found for this day
                                 }
                             }
                             // If result.getOrNull() is null (a failure), this will also return null

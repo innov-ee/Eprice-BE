@@ -115,6 +115,17 @@ class GetPriceStatisticsUseCaseTest {
     }
 
     @Test
+    fun `execute named tomorrow returns NoDataFoundException when tomorrow only has partial 1-2 hours data`() = runBlocking {
+        // Tomorrow only has 2 hours of data
+        repo.entries[LocalDate.of(2026, 8, 23)] = DailyStatEntry(min = 0.10, max = 0.12, avg = 0.11, sum = 0.22, count = 2)
+        repo.defaultEntryProvider = { null }
+
+        val result = useCase.execute("EE", PriceStatsQuery.Named(NamedRange.TOMORROW))
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is NoDataFoundException)
+    }
+
+    @Test
     fun `execute with custom range spanning into unpublished tomorrow calculates available days`() = runBlocking {
         val start = LocalDate.of(2026, 8, 20)
         val end = LocalDate.of(2026, 8, 23) // 4 days requested
