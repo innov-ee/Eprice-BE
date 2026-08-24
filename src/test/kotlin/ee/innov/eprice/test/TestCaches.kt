@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class NoOpPriceCache : PriceCache {
     override fun get(key: String): List<DomainEnergyPrice>? = null
-    override fun put(key: String, prices: List<DomainEnergyPrice>) {}
+    override fun put(key: String, prices: List<DomainEnergyPrice>, isComplete: Boolean) {}
     override fun clear() {}
 }
 

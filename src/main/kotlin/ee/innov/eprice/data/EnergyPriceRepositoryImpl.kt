@@ -5,10 +5,12 @@ import ee.innov.eprice.data.elering.toDomainEnergyPrices
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.data.entsoe.toBiddingZone
 import ee.innov.eprice.data.entsoe.toDomainEnergyPrices
+import ee.innov.eprice.domain.CountryZoneProvider
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
+import ee.innov.eprice.domain.model.isCompleteRange
 import ee.innov.eprice.domain.model.toApiError
 import ee.innov.eprice.monitoring.ServiceMonitor
 import org.slf4j.LoggerFactory
@@ -48,7 +50,9 @@ class EnergyPriceRepositoryImpl(
         if (cacheResults) {
             networkResult.onSuccess { prices ->
                 if (prices.isNotEmpty()) {
-                    cache.put(cacheKey, prices)
+                    val zoneId = CountryZoneProvider.getZoneId(countryCode)
+                    val isComplete = prices.isCompleteRange(zoneId, start, end)
+                    cache.put(cacheKey, prices, isComplete = isComplete)
                 }
             }
         }
