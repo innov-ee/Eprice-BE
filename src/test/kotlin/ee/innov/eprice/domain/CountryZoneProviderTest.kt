@@ -29,6 +29,7 @@ class CountryZoneProviderTest {
         assertEquals(ZoneId.of("Europe/Oslo"), CountryZoneProvider.getZoneId("NO1"))
         assertEquals(ZoneId.of("Europe/Lisbon"), CountryZoneProvider.getZoneId("PT"))
         assertEquals(ZoneId.of("Europe/London"), CountryZoneProvider.getZoneId("UK"))
+        assertEquals(ZoneId.of("Europe/Dublin"), CountryZoneProvider.getZoneId("IE"))
         assertEquals(ZoneId.of("Europe/Rome"), CountryZoneProvider.getZoneId("IT-NORD"))
         assertEquals(ZoneId.of("Europe/Rome"), CountryZoneProvider.getZoneId("IT_NORD"))
         assertEquals(ZoneId.of("Europe/Tallinn"), CountryZoneProvider.getZoneId("UNKNOWN"))

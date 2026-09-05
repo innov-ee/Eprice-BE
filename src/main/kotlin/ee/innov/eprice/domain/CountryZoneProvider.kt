@@ -14,19 +14,16 @@ object CountryZoneProvider {
         "LV" to ZoneId.of("Europe/Riga"),
         "LT" to ZoneId.of("Europe/Vilnius"),
 
-        // Nordics
-        "SE" to ZoneId.of("Europe/Stockholm"),
+        // Nordics (Bidding Zones)
         "SE1" to ZoneId.of("Europe/Stockholm"),
         "SE2" to ZoneId.of("Europe/Stockholm"),
         "SE3" to ZoneId.of("Europe/Stockholm"),
         "SE4" to ZoneId.of("Europe/Stockholm"),
-        "NO" to ZoneId.of("Europe/Oslo"),
         "NO1" to ZoneId.of("Europe/Oslo"),
         "NO2" to ZoneId.of("Europe/Oslo"),
         "NO3" to ZoneId.of("Europe/Oslo"),
         "NO4" to ZoneId.of("Europe/Oslo"),
         "NO5" to ZoneId.of("Europe/Oslo"),
-        "DK" to ZoneId.of("Europe/Copenhagen"),
         "DK1" to ZoneId.of("Europe/Copenhagen"),
         "DK2" to ZoneId.of("Europe/Copenhagen"),
 
@@ -58,10 +55,8 @@ object CountryZoneProvider {
         "GB" to ZoneId.of("Europe/London"),
         "UK" to ZoneId.of("Europe/London"),
         "IE" to ZoneId.of("Europe/Dublin"),
-        "NIR" to ZoneId.of("Europe/Belfast"),
 
-        // Italy & Bidding Zones
-        "IT" to ZoneId.of("Europe/Rome"),
+        // Italy (Bidding Zones)
         "IT-NORD" to ZoneId.of("Europe/Rome"),
         "IT_NORD" to ZoneId.of("Europe/Rome"),
         "IT-CNOR" to ZoneId.of("Europe/Rome"),
@@ -85,17 +80,7 @@ object CountryZoneProvider {
         "BA" to ZoneId.of("Europe/Sarajevo"),
         "XK" to ZoneId.of("Europe/Belgrade"),
         "UA" to ZoneId.of("Europe/Kyiv"),
-        "UA-DOB" to ZoneId.of("Europe/Kyiv"),
-        "UA_DOB" to ZoneId.of("Europe/Kyiv"),
-        "UA-BEI" to ZoneId.of("Europe/Kyiv"),
-        "UA_BEI" to ZoneId.of("Europe/Kyiv"),
-        "UA-IPS" to ZoneId.of("Europe/Kyiv"),
-        "UA_IPS" to ZoneId.of("Europe/Kyiv"),
-        "MD" to ZoneId.of("Europe/Chisinau"),
-        "GE" to ZoneId.of("Asia/Tbilisi"),
-        "TR" to ZoneId.of("Europe/Istanbul"),
-        "CY" to ZoneId.of("Asia/Nicosia"),
-        "MT" to ZoneId.of("Europe/Malta")
+        "MD" to ZoneId.of("Europe/Chisinau")
     )
 
     fun getZoneId(countryCode: String): ZoneId =

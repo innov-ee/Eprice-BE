@@ -115,19 +115,16 @@ private val biddingZoneMap: Map<String, String> = mapOf(
     "LT" to "10YLT-1001A0008Q",
     "LV" to "10YLV-1001A00074",
 
-    // Nordics
-    "SE" to "10YSE-1--------K",
+    // Nordics (Bidding Zones)
     "SE1" to "10Y1001A1001A44P",
     "SE2" to "10Y1001A1001A45N",
     "SE3" to "10Y1001A1001A46L",
     "SE4" to "10Y1001A1001A47J",
-    "NO" to "10YNO-0--------C",
     "NO1" to "10YNO-1--------2",
     "NO2" to "10YNO-2--------T",
     "NO3" to "10YNO-3--------J",
     "NO4" to "10YNO-4--------9",
     "NO5" to "10Y1001A1001A48H",
-    "DK" to "10Y1001A1001A65U",
     "DK1" to "10YDK-1--------W",
     "DK2" to "10YDK-2--------M",
 
@@ -159,11 +156,8 @@ private val biddingZoneMap: Map<String, String> = mapOf(
     "GB" to "10YGB----------A",
     "UK" to "10YGB----------A",
     "IE" to "10Y1001A1001A59C",
-    "SEM" to "10Y1001A1001A59C",
-    "NIR" to "10Y1001A1001A016",
 
-    // Italy & Bidding Zones
-    "IT" to "10YIT-GRTN-----B",
+    // Italy (Bidding Zones)
     "IT-NORD" to "10Y1001A1001A73P",
     "IT_NORD" to "10Y1001A1001A73P",
     "IT-CNOR" to "10Y1001A1001A70V",
@@ -187,17 +181,7 @@ private val biddingZoneMap: Map<String, String> = mapOf(
     "BA" to "10YBA-JPCC-----D",
     "XK" to "10Y1001C--00100H",
     "UA" to "10Y1001C--00003F",
-    "UA-DOB" to "10Y1001A1001A869",
-    "UA_DOB" to "10Y1001A1001A869",
-    "UA-BEI" to "10YUA-WEPS-----0",
-    "UA_BEI" to "10YUA-WEPS-----0",
-    "UA-IPS" to "10Y1001C--000182",
-    "UA_IPS" to "10Y1001C--000182",
-    "MD" to "10Y1001A1001A990",
-    "GE" to "10Y1001A1001B012",
-    "TR" to "10YTR-TEIAS----W",
-    "CY" to "10YCY-1001A0003J",
-    "MT" to "10Y1001A1001A77H"
+    "MD" to "10Y1001A1001A990"
 )
 
 /**

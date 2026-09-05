@@ -35,7 +35,8 @@ class EnergyPriceRepositoryImpl(
         end: Instant,
         cacheResults: Boolean,
     ): Result<List<DomainEnergyPrice>> {
-        val cacheKey = "${countryCode}_${start}_$end"
+        val normalizedCode = countryCode.trim().uppercase()
+        val cacheKey = "${normalizedCode}_${start}_$end"
 
         val cachedPrices = cache.get(cacheKey)
         if (cachedPrices != null) {
@@ -49,12 +50,12 @@ class EnergyPriceRepositoryImpl(
             monitor?.recordCacheMiss()
         }
 
-        val networkResult = fetchFromNetwork(countryCode, start, end)
+        val networkResult = fetchFromNetwork(normalizedCode, start, end)
 
         if (cacheResults) {
             networkResult.onSuccess { prices ->
                 if (prices.isNotEmpty()) {
-                    val zoneId = CountryZoneProvider.getZoneId(countryCode)
+                    val zoneId = CountryZoneProvider.getZoneId(normalizedCode)
                     val isComplete = prices.isCompleteRange(zoneId, start, end)
                     cache.put(cacheKey, prices, isComplete = isComplete)
                 }
@@ -69,12 +70,10 @@ class EnergyPriceRepositoryImpl(
      * Strategy: Try Elering first for Baltic/Nordic supported countries, otherwise or on failure query ENTSO-E.
      */
     private suspend fun fetchFromNetwork(
-        countryCode: String,
+        normalizedCode: String,
         start: Instant,
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
-        val normalizedCode = countryCode.trim().uppercase()
-
         // Strategy: Try Elering first if supported.
         if (normalizedCode in ELERING_SUPPORTED_COUNTRIES) {
             try {
@@ -94,8 +93,8 @@ class EnergyPriceRepositoryImpl(
         val biddingZone = normalizedCode.toBiddingZone()
             ?: return Result.failure(
                 ApiError.Unknown(
-                    "Unsupported country or bidding zone code: $countryCode",
-                    IllegalArgumentException("No ENTSO-E bidding zone mapping for $countryCode")
+                    "Unsupported country or bidding zone code: $normalizedCode",
+                    IllegalArgumentException("No ENTSO-E bidding zone mapping for $normalizedCode")
                 )
             )
 
