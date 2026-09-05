@@ -142,9 +142,9 @@ private val biddingZoneMap: Map<String, String> = mapOf(
     "HU" to "10YHU-MAVIR----U",
     "SI" to "10YSI-ELES-----O",
     "HR" to "10YHR-HEP------M",
-    "RO" to "10YRO-TEL------6",
+    "RO" to "10YRO-TEL------P",
     "BG" to "10YCA-BULGARIA-R",
-    "GR" to "10YGR-HTSO-----1",
+    "GR" to "10YGR-HTSO-----Y",
     "LU" to "10Y1001A1001A82H",
 
     // Iberia
@@ -157,12 +157,12 @@ private val biddingZoneMap: Map<String, String> = mapOf(
     "IE" to "10Y1001A1001A59C",
 
     // Italy (Bidding Zones)
-    "IT_NORD" to "10Y1001A1001A73P",
-    "IT_CNOR" to "10Y1001A1001A70V",
-    "IT_CSUD" to "10Y1001A1001A71T",
-    "IT_SUD" to "10Y1001A1001A78F",
-    "IT_SICI" to "10Y1001A1001A75L",
-    "IT_SARD" to "10Y1001A1001A74N",
+    "IT_NORD" to "10Y1001A1001A73I",
+    "IT_CNOR" to "10Y1001A1001A70O",
+    "IT_CSUD" to "10Y1001A1001A71M",
+    "IT_SUD" to "10Y1001A1001A788",
+    "IT_SICI" to "10Y1001A1001A75E",
+    "IT_SARD" to "10Y1001A1001A74G",
     "IT_CALA" to "10Y1001C--00096J",
 
     // Southeastern Europe & Non-EU

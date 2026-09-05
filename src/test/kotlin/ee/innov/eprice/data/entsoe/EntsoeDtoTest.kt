@@ -88,8 +88,10 @@ class EntsoeDtoTest {
         assertEquals("10YFR-RTE------C", "FR".toBiddingZone())
         assertEquals("10Y1001A1001A46L", "SE3".toBiddingZone())
         assertEquals("10YNO-1--------2", "NO1".toBiddingZone())
-        assertEquals("10Y1001A1001A73P", "IT-NORD".toBiddingZone())
-        assertEquals("10Y1001A1001A73P", "IT_NORD".toBiddingZone())
+        assertEquals("10Y1001A1001A73I", "IT-NORD".toBiddingZone())
+        assertEquals("10Y1001A1001A73I", "IT_NORD".toBiddingZone())
+        assertEquals("10Y1001A1001A75E", "IT_SICI".toBiddingZone())
+        assertEquals("10Y1001A1001A70O", "IT_CNOR".toBiddingZone())
 
         // Direct 16-character EIC code pass-through
         val directEic = "10Y1001A1001A82H"
