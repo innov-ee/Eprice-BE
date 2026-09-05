@@ -1,6 +1,8 @@
 package ee.innov.eprice.data
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.CountryZoneProvider
@@ -197,5 +199,63 @@ class EnergyPriceRepositoryImplTest {
         val thirdResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(thirdResult.isSuccess)
         assertEquals(2, networkCallCount.get(), "Should refetch after TTL expires")
+    }
+
+    @Test
+    fun `getPrices for non-Baltic country queries ENTSO-E directly bypassing Elering`() = runBlocking<Unit> {
+        val requestedUrls = mutableListOf<String>()
+        val zoneId = CountryZoneProvider.getZoneId("DE")
+        val d1 = LocalDate.of(2026, 8, 22)
+        val start = d1.atStartOfDay(zoneId).toInstant()
+        val end = d1.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+
+        val entsoeXml = """
+            <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
+                <TimeSeries>
+                    <Period>
+                        <timeInterval>
+                            <start>2026-08-21T22:00Z</start>
+                            <end>2026-08-22T22:00Z</end>
+                        </timeInterval>
+                        <resolution>PT60M</resolution>
+                        ${(1..24).joinToString("\n") { "<Point><position>$it</position><price.amount>120.0</price.amount></Point>" }}
+                    </Period>
+                </TimeSeries>
+            </Publication_MarketDocument>
+        """.trimIndent()
+
+        val mockEngine = MockEngine { request ->
+            requestedUrls.add(request.url.toString())
+            respond(
+                content = entsoeXml,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/xml")
+            )
+        }
+
+        val httpClient = HttpClient(mockEngine)
+        val eleringService = EleringService(httpClient)
+        val entsoeService = EntsoeService(httpClient, XmlMapper().apply {
+            registerKotlinModule()
+            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        }, "TEST_API_KEY")
+
+        val tempFile = createTempCacheFile("repo-entsoe-direct-test")
+        val inMemoryCache = InMemoryPriceCache(cacheFile = tempFile)
+
+        val repository = EnergyPriceRepositoryImpl(
+            entsoeService = entsoeService,
+            eleringService = eleringService,
+            cache = inMemoryCache
+        )
+
+        val result = repository.getPrices("DE", start, end, cacheResults = true)
+        assertTrue(result.isSuccess)
+        assertEquals(24, result.getOrThrow().size)
+
+        // Verify only ENTSO-E URL was called, not Elering
+        assertEquals(1, requestedUrls.size)
+        assertTrue(requestedUrls[0].contains("tp.entsoe.eu"))
+        assertFalse(requestedUrls.any { it.contains("elering.ee") })
     }
 }

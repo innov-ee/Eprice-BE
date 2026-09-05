@@ -105,17 +105,109 @@ fun PublicationMarketDocument.toDomainEnergyPrices(): List<DomainEnergyPrice> {
                 }
             }
         }
-    }
+    }.distinctBy { it.startTime }.sortedBy { it.startTime }
 }
 
+private val biddingZoneMap: Map<String, String> = mapOf(
+    // Baltics
+    "EE" to "10Y1001A1001A39I",
+    "FI" to "10YFI-1--------U",
+    "LT" to "10YLT-1001A0008Q",
+    "LV" to "10YLV-1001A00074",
+
+    // Nordics
+    "SE" to "10YSE-1--------K",
+    "SE1" to "10Y1001A1001A44P",
+    "SE2" to "10Y1001A1001A45N",
+    "SE3" to "10Y1001A1001A46L",
+    "SE4" to "10Y1001A1001A47J",
+    "NO" to "10YNO-0--------C",
+    "NO1" to "10YNO-1--------2",
+    "NO2" to "10YNO-2--------T",
+    "NO3" to "10YNO-3--------J",
+    "NO4" to "10YNO-4--------9",
+    "NO5" to "10Y1001A1001A48H",
+    "DK" to "10Y1001A1001A65U",
+    "DK1" to "10YDK-1--------W",
+    "DK2" to "10YDK-2--------M",
+
+    // Western & Central Europe
+    "DE" to "10Y1001A1001A82H",
+    "DE-LU" to "10Y1001A1001A82H",
+    "DE_LU" to "10Y1001A1001A82H",
+    "AT" to "10YAT-APG------L",
+    "BE" to "10YBE----------2",
+    "FR" to "10YFR-RTE------C",
+    "NL" to "10YNL----------L",
+    "CH" to "10YCH-SWISSGRIDZ",
+    "PL" to "10YPL-AREA-----S",
+    "CZ" to "10YCZ-CEPS-----N",
+    "SK" to "10YSK-SEPS-----K",
+    "HU" to "10YHU-MAVIR----U",
+    "SI" to "10YSI-ELES-----O",
+    "HR" to "10YHR-HEP------M",
+    "RO" to "10YRO-TEL------6",
+    "BG" to "10YCA-BULGARIA-R",
+    "GR" to "10YGR-HTSO-----1",
+    "LU" to "10Y1001A1001A82H",
+
+    // Iberia
+    "ES" to "10YES-REE------0",
+    "PT" to "10YPT-REN------W",
+
+    // British Isles
+    "GB" to "10YGB----------A",
+    "UK" to "10YGB----------A",
+    "IE" to "10Y1001A1001A59C",
+    "SEM" to "10Y1001A1001A59C",
+    "NIR" to "10Y1001A1001A016",
+
+    // Italy & Bidding Zones
+    "IT" to "10YIT-GRTN-----B",
+    "IT-NORD" to "10Y1001A1001A73P",
+    "IT_NORD" to "10Y1001A1001A73P",
+    "IT-CNOR" to "10Y1001A1001A70V",
+    "IT_CNOR" to "10Y1001A1001A70V",
+    "IT-CSUD" to "10Y1001A1001A71T",
+    "IT_CSUD" to "10Y1001A1001A71T",
+    "IT-SUD" to "10Y1001A1001A78F",
+    "IT_SUD" to "10Y1001A1001A78F",
+    "IT-SICI" to "10Y1001A1001A75L",
+    "IT_SICI" to "10Y1001A1001A75L",
+    "IT-SARD" to "10Y1001A1001A74N",
+    "IT_SARD" to "10Y1001A1001A74N",
+    "IT-CALA" to "10Y1001C--00096J",
+    "IT_CALA" to "10Y1001C--00096J",
+
+    // Southeastern Europe & Non-EU
+    "RS" to "10YCS-SERBIATSOV",
+    "ME" to "10YCS-CG-TSO---S",
+    "MK" to "10YMK-MEPSO----8",
+    "AL" to "10YAL-KESH-----5",
+    "BA" to "10YBA-JPCC-----D",
+    "XK" to "10Y1001C--00100H",
+    "UA" to "10Y1001C--00003F",
+    "UA-DOB" to "10Y1001A1001A869",
+    "UA_DOB" to "10Y1001A1001A869",
+    "UA-BEI" to "10YUA-WEPS-----0",
+    "UA_BEI" to "10YUA-WEPS-----0",
+    "UA-IPS" to "10Y1001C--000182",
+    "UA_IPS" to "10Y1001C--000182",
+    "MD" to "10Y1001A1001A990",
+    "GE" to "10Y1001A1001B012",
+    "TR" to "10YTR-TEIAS----W",
+    "CY" to "10YCY-1001A0003J",
+    "MT" to "10Y1001A1001A77H"
+)
+
 /**
- * Maps a 2-letter country code to its corresponding ENTSO-E Bidding Zone.
- * This mapping must be expanded to support new countries.
+ * Maps a 2-letter country code or bidding zone name to its corresponding ENTSO-E Bidding Zone EIC code.
+ * If the input is already a valid 16-character EIC code, it is returned directly.
  */
-internal fun String.toBiddingZone(): String? = when (this.uppercase()) {
-    "EE" -> "10Y1001A1001A39I"
-    "FI" -> "10YFI-1--------U"
-    "LT" -> "10YLT-1001A0008Q"
-    "LV" -> "10YLV-1001A00074"
-    else -> null
+internal fun String.toBiddingZone(): String? {
+    val normalized = this.trim().uppercase()
+    if (normalized.length == 16 && (normalized.startsWith("10Y") || normalized.startsWith("10X") || normalized.startsWith("10Z"))) {
+        return normalized
+    }
+    return biddingZoneMap[normalized.replace('_', '-')] ?: biddingZoneMap[normalized]
 }

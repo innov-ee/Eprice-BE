@@ -64,6 +64,11 @@ object EndpointCatalog {
                 EndpointSample(label = "Latvia (LV)", path = "/api/prices/LV"),
                 EndpointSample(label = "Lithuania (LT)", path = "/api/prices/LT"),
                 EndpointSample(label = "Finland (FI)", path = "/api/prices/FI"),
+                EndpointSample(label = "Germany (DE)", path = "/api/prices/DE"),
+                EndpointSample(label = "France (FR)", path = "/api/prices/FR"),
+                EndpointSample(label = "Sweden (SE3)", path = "/api/prices/SE3"),
+                EndpointSample(label = "Norway (NO1)", path = "/api/prices/NO1"),
+                EndpointSample(label = "Poland (PL)", path = "/api/prices/PL"),
                 EndpointSample(label = "Default (EE)", path = "/api/prices")
             )
         ),
@@ -74,6 +79,7 @@ object EndpointCatalog {
             description = "Rolling average electricity price.",
             samples = listOf(
                 EndpointSample(label = "EE Rolling Avg", path = "/api/prices/EE/avg"),
+                EndpointSample(label = "DE Rolling Avg", path = "/api/prices/DE/avg"),
                 EndpointSample(label = "LV Rolling Avg", path = "/api/prices/LV/avg"),
                 EndpointSample(label = "FI Rolling Avg", path = "/api/prices/FI/avg")
             )
@@ -85,6 +91,7 @@ object EndpointCatalog {
             description = "Daily price summary with min, max, average, and timestamp bounds.",
             samples = listOf(
                 EndpointSample(label = "EE Today Summary", path = "/api/prices/EE/stats/summary"),
+                EndpointSample(label = "DE Today Summary", path = "/api/prices/DE/stats/summary"),
                 EndpointSample(label = "FI Today Summary", path = "/api/prices/FI/stats/summary")
             )
         ),

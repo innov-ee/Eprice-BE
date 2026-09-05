@@ -79,6 +79,27 @@ class EntsoeDtoTest {
     }
 
     @Test
+    fun `toBiddingZone maps countries, subzones, and direct EIC codes correctly`() {
+        assertEquals("10Y1001A1001A39I", "EE".toBiddingZone())
+        assertEquals("10YFI-1--------U", "FI".toBiddingZone())
+        assertEquals("10Y1001A1001A82H", "DE".toBiddingZone())
+        assertEquals("10Y1001A1001A82H", "DE-LU".toBiddingZone())
+        assertEquals("10Y1001A1001A82H", "DE_LU".toBiddingZone())
+        assertEquals("10YFR-RTE------C", "FR".toBiddingZone())
+        assertEquals("10Y1001A1001A46L", "SE3".toBiddingZone())
+        assertEquals("10YNO-1--------2", "NO1".toBiddingZone())
+        assertEquals("10Y1001A1001A73P", "IT-NORD".toBiddingZone())
+        assertEquals("10Y1001A1001A73P", "IT_NORD".toBiddingZone())
+
+        // Direct 16-character EIC code pass-through
+        val directEic = "10Y1001A1001A82H"
+        assertEquals(directEic, directEic.toBiddingZone())
+
+        // Unknown code returns null
+        assertEquals(null, "INVALID_CODE".toBiddingZone())
+    }
+
+    @Test
     fun `toDomainEnergyPrices parses multiple time series correctly`() {
         val xml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
@@ -118,5 +139,47 @@ class EntsoeDtoTest {
         assertEquals(48, prices.size)
         assertEquals(0.05, prices[0].pricePerKWh)
         assertEquals(0.075, prices[24].pricePerKWh)
+    }
+
+    @Test
+    fun `toDomainEnergyPrices deduplicates overlapping time series for same interval`() {
+        val xml = """
+            <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
+                <TimeSeries>
+                    <mRID>1</mRID>
+                    <Period>
+                        <timeInterval>
+                            <start>2026-08-20T22:00Z</start>
+                            <end>2026-08-21T22:00Z</end>
+                        </timeInterval>
+                        <resolution>PT60M</resolution>
+                        <Point>
+                            <position>1</position>
+                            <price.amount>50.0</price.amount>
+                        </Point>
+                    </Period>
+                </TimeSeries>
+                <TimeSeries>
+                    <mRID>2</mRID>
+                    <Period>
+                        <timeInterval>
+                            <start>2026-08-20T22:00Z</start>
+                            <end>2026-08-21T22:00Z</end>
+                        </timeInterval>
+                        <resolution>PT60M</resolution>
+                        <Point>
+                            <position>1</position>
+                            <price.amount>50.0</price.amount>
+                        </Point>
+                    </Period>
+                </TimeSeries>
+            </Publication_MarketDocument>
+        """.trimIndent()
+
+        val doc = xmlMapper.readValue(xml, PublicationMarketDocument::class.java)
+        val prices = doc.toDomainEnergyPrices()
+
+        // Should deduplicate and return 24 points, not 48
+        assertEquals(24, prices.size)
     }
 }
