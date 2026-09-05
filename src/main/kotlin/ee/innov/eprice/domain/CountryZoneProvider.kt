@@ -29,7 +29,6 @@ object CountryZoneProvider {
 
         // Western & Central Europe
         "DE" to ZoneId.of("Europe/Berlin"),
-        "DE-LU" to ZoneId.of("Europe/Berlin"),
         "DE_LU" to ZoneId.of("Europe/Berlin"),
         "AT" to ZoneId.of("Europe/Vienna"),
         "BE" to ZoneId.of("Europe/Brussels"),
@@ -57,19 +56,12 @@ object CountryZoneProvider {
         "IE" to ZoneId.of("Europe/Dublin"),
 
         // Italy (Bidding Zones)
-        "IT-NORD" to ZoneId.of("Europe/Rome"),
         "IT_NORD" to ZoneId.of("Europe/Rome"),
-        "IT-CNOR" to ZoneId.of("Europe/Rome"),
         "IT_CNOR" to ZoneId.of("Europe/Rome"),
-        "IT-CSUD" to ZoneId.of("Europe/Rome"),
         "IT_CSUD" to ZoneId.of("Europe/Rome"),
-        "IT-SUD" to ZoneId.of("Europe/Rome"),
         "IT_SUD" to ZoneId.of("Europe/Rome"),
-        "IT-SICI" to ZoneId.of("Europe/Rome"),
         "IT_SICI" to ZoneId.of("Europe/Rome"),
-        "IT-SARD" to ZoneId.of("Europe/Rome"),
         "IT_SARD" to ZoneId.of("Europe/Rome"),
-        "IT-CALA" to ZoneId.of("Europe/Rome"),
         "IT_CALA" to ZoneId.of("Europe/Rome"),
 
         // Southeastern Europe & Non-EU
@@ -84,8 +76,8 @@ object CountryZoneProvider {
     )
 
     fun getZoneId(countryCode: String): ZoneId =
-        countryZoneMap[countryCode.uppercase().replace('_', '-')]
-            ?: countryZoneMap[countryCode.uppercase()]
+        countryZoneMap[countryCode.trim().uppercase().replace('-', '_')]
+            ?: countryZoneMap[countryCode.trim().uppercase()]
             ?: defaultZoneId
 
     /**

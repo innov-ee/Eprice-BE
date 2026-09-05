@@ -321,5 +321,15 @@ class EnergyPriceRepositoryImplTest {
         val result3 = repository.getPrices("DE", start, end, cacheResults = true)
         assertTrue(result3.isSuccess)
         assertEquals(1, networkCallCount)
+
+        // Fourth call with hyphen "DE-LU" should hit cache for DE_LU
+        val result4 = repository.getPrices("DE-LU", start, end, cacheResults = true)
+        assertTrue(result4.isSuccess)
+        assertEquals(2, networkCallCount)
+
+        // Fifth call with underscore "DE_LU" should hit cache
+        val result5 = repository.getPrices("DE_LU", start, end, cacheResults = true)
+        assertTrue(result5.isSuccess)
+        assertEquals(2, networkCallCount)
     }
 }

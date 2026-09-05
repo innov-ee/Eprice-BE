@@ -130,7 +130,6 @@ private val biddingZoneMap: Map<String, String> = mapOf(
 
     // Western & Central Europe
     "DE" to "10Y1001A1001A82H",
-    "DE-LU" to "10Y1001A1001A82H",
     "DE_LU" to "10Y1001A1001A82H",
     "AT" to "10YAT-APG------L",
     "BE" to "10YBE----------2",
@@ -158,19 +157,12 @@ private val biddingZoneMap: Map<String, String> = mapOf(
     "IE" to "10Y1001A1001A59C",
 
     // Italy (Bidding Zones)
-    "IT-NORD" to "10Y1001A1001A73P",
     "IT_NORD" to "10Y1001A1001A73P",
-    "IT-CNOR" to "10Y1001A1001A70V",
     "IT_CNOR" to "10Y1001A1001A70V",
-    "IT-CSUD" to "10Y1001A1001A71T",
     "IT_CSUD" to "10Y1001A1001A71T",
-    "IT-SUD" to "10Y1001A1001A78F",
     "IT_SUD" to "10Y1001A1001A78F",
-    "IT-SICI" to "10Y1001A1001A75L",
     "IT_SICI" to "10Y1001A1001A75L",
-    "IT-SARD" to "10Y1001A1001A74N",
     "IT_SARD" to "10Y1001A1001A74N",
-    "IT-CALA" to "10Y1001C--00096J",
     "IT_CALA" to "10Y1001C--00096J",
 
     // Southeastern Europe & Non-EU
@@ -193,5 +185,5 @@ internal fun String.toBiddingZone(): String? {
     if (normalized.length == 16 && (normalized.startsWith("10Y") || normalized.startsWith("10X") || normalized.startsWith("10Z"))) {
         return normalized
     }
-    return biddingZoneMap[normalized.replace('_', '-')] ?: biddingZoneMap[normalized]
+    return biddingZoneMap[normalized.replace('-', '_')] ?: biddingZoneMap[normalized]
 }

@@ -35,7 +35,7 @@ class EnergyPriceRepositoryImpl(
         end: Instant,
         cacheResults: Boolean,
     ): Result<List<DomainEnergyPrice>> {
-        val normalizedCode = countryCode.trim().uppercase()
+        val normalizedCode = countryCode.trim().uppercase().replace('-', '_')
         val cacheKey = "${normalizedCode}_${start}_$end"
 
         val cachedPrices = cache.get(cacheKey)
