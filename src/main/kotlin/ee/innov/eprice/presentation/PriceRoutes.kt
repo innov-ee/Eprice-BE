@@ -7,6 +7,7 @@ import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
+import ee.innov.eprice.domain.normalizeCountryCode
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.PriceStatsQuery
@@ -82,7 +83,7 @@ fun Route.priceRoutes() {
     }
 
     get("/api/prices/{countryCode?}") {
-        val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
+        val countryCode = call.parameters["countryCode"]?.normalizeCountryCode() ?: "EE"
 
         val result = getEnergyPricesUseCase.execute(countryCode)
 
@@ -98,7 +99,7 @@ fun Route.priceRoutes() {
     }
 
     get("/api/prices/{countryCode}/avg") {
-        val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
+        val countryCode = call.parameters["countryCode"]?.normalizeCountryCode() ?: "EE"
         val days = 5
         val result = getRollingAveragePriceUseCase.execute(countryCode, days)
 
@@ -111,7 +112,7 @@ fun Route.priceRoutes() {
     }
 
     get("/api/prices/{countryCode}/stats/summary") {
-        val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
+        val countryCode = call.parameters["countryCode"]?.normalizeCountryCode() ?: "EE"
 
         val result = getPriceSummaryUseCase.execute(countryCode)
 
@@ -124,7 +125,7 @@ fun Route.priceRoutes() {
     }
 
     get("/api/prices/{countryCode}/stats") {
-        val countryCode = call.parameters["countryCode"]?.uppercase() ?: "EE"
+        val countryCode = call.parameters["countryCode"]?.normalizeCountryCode() ?: "EE"
 
         val query = try {
             parsePriceStatsQuery(call.request.queryParameters)

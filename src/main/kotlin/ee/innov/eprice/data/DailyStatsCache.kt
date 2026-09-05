@@ -45,15 +45,14 @@ class FileBackedDailyStatsCache(
 
     override fun get(countryCode: String, date: LocalDate): DailyStatEntry? {
         val dateString = date.format(dateFormatter)
-        return cache[countryCode.uppercase()]?.get(dateString)
+        return cache[countryCode]?.get(dateString)
     }
 
     // For multiple entries use putBatch instead - this writes the whole cache to disk on every call.
     override fun put(countryCode: String, date: LocalDate, stats: DailyStatEntry) {
-        val ucCountryCode = countryCode.uppercase()
         val dateString = date.format(dateFormatter)
 
-        val countryCache = cache.getOrPut(ucCountryCode) { ConcurrentHashMap() }
+        val countryCache = cache.getOrPut(countryCode) { ConcurrentHashMap() }
         countryCache[dateString] = stats
 
         writeCacheToFile()
@@ -61,8 +60,7 @@ class FileBackedDailyStatsCache(
 
     override fun putBatch(countryCode: String, entries: Map<LocalDate, DailyStatEntry>) {
         if (entries.isEmpty()) return
-        val ucCountryCode = countryCode.uppercase()
-        val countryCache = cache.getOrPut(ucCountryCode) { ConcurrentHashMap() }
+        val countryCache = cache.getOrPut(countryCode) { ConcurrentHashMap() }
 
         entries.forEach { (date, stats) ->
             val dateString = date.format(dateFormatter)
@@ -79,7 +77,7 @@ class FileBackedDailyStatsCache(
         startDate: LocalDate,
         endDate: LocalDate
     ): Map<LocalDate, DailyStatEntry> {
-        val countryCache = cache[countryCode.uppercase()] ?: return emptyMap()
+        val countryCache = cache[countryCode] ?: return emptyMap()
 
         return countryCache
             .mapKeysNotNull { LocalDate.parse(it.key, dateFormatter) }

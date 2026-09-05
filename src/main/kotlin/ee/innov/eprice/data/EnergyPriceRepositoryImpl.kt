@@ -25,6 +25,10 @@ class EnergyPriceRepositoryImpl(
 
     private val logger = LoggerFactory.getLogger(EnergyPriceRepositoryImpl::class.java)
 
+    companion object {
+        private val ELERING_SUPPORTED_COUNTRIES = setOf("EE", "FI", "LV", "LT")
+    }
+
     override suspend fun getPrices(
         countryCode: String,
         start: Instant,
@@ -62,32 +66,34 @@ class EnergyPriceRepositoryImpl(
 
     /**
      * Contains the network-fetching logic.
-     * Strategy: Try Elering first, fallback to ENTSO-E.
+     * Strategy: Try Elering first for Baltic/Nordic supported countries, otherwise or on failure query ENTSO-E.
      */
     private suspend fun fetchFromNetwork(
-        countryCode: String,
+        normalizedCode: String,
         start: Instant,
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
-        // Strategy: Try Elering first.
-        try {
-            val eleringMarketDocument = eleringService.fetchPrices(countryCode, start, end)
-            val prices = eleringMarketDocument.toDomainEnergyPrices(countryCode)
-            if (prices.isNotEmpty()) {
-                return Result.success(prices)
+        // Strategy: Try Elering first if supported.
+        if (normalizedCode in ELERING_SUPPORTED_COUNTRIES) {
+            try {
+                val eleringMarketDocument = eleringService.fetchPrices(normalizedCode, start, end)
+                val prices = eleringMarketDocument.toDomainEnergyPrices(normalizedCode)
+                if (prices.isNotEmpty()) {
+                    return Result.success(prices)
+                }
+            } catch (e: NoDataFoundException) {
+                logger.info("Elering reported no data for $normalizedCode ($start to $end), attempting ENTSO-E fallback")
+            } catch (e: Exception) {
+                logger.warn("Elering fetch failed for $normalizedCode ($start to $end): ${e.message}, attempting ENTSO-E fallback")
             }
-        } catch (e: NoDataFoundException) {
-            logger.info("Elering reported no data for $countryCode ($start to $end), attempting ENTSO-E fallback")
-        } catch (e: Exception) {
-            logger.warn("Elering fetch failed for $countryCode ($start to $end): ${e.message}, attempting ENTSO-E fallback")
         }
 
-        // Elering failed or had no data, try ENTSO-E fallback
-        val biddingZone = countryCode.toBiddingZone()
+        // Try ENTSO-E
+        val biddingZone = normalizedCode.toBiddingZone()
             ?: return Result.failure(
                 ApiError.Unknown(
-                    "Unsupported country code for ENTSO-E fallback: $countryCode",
-                    IllegalArgumentException("No bidding zone mapping for $countryCode")
+                    "Unsupported country or bidding zone code: $normalizedCode",
+                    IllegalArgumentException("No ENTSO-E bidding zone mapping for $normalizedCode")
                 )
             )
 

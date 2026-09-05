@@ -22,6 +22,7 @@ import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.logging.LogLevel
@@ -40,10 +41,21 @@ val appModule = module {
         val monitor = get<ServiceMonitor>()
 
         HttpClient(CIO) {
+            engine {
+                requestTimeout = 60_000
+                maxConnectionsCount = 1000
+            }
+
             install(HttpTimeout) {
-                requestTimeoutMillis = 15000
-                connectTimeoutMillis = 10000
-                socketTimeoutMillis = 10000
+                requestTimeoutMillis = 60_000
+                connectTimeoutMillis = 15_000
+                socketTimeoutMillis = 30_000
+            }
+
+            install(HttpRequestRetry) {
+                retryOnServerErrors(maxRetries = 3)
+                retryOnException(maxRetries = 3, retryOnTimeout = true)
+                exponentialDelay()
             }
 
             install(createClientPlugin("OutgoingMonitor") {

@@ -33,7 +33,7 @@ data class EleringPriceData(
 fun EleringPriceResponse.toDomainEnergyPrices(countryCode: String): List<DomainEnergyPrice> {
     if (!this.success) return emptyList()
 
-    val prices = this.data[countryCode.uppercase()] ?: return emptyList()
+    val prices = this.data[countryCode] ?: return emptyList()
 
     return prices.map {
         DomainEnergyPrice(

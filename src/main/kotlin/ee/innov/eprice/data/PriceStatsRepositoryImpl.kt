@@ -23,12 +23,11 @@ class PriceStatsRepositoryImpl(
         startDate: LocalDate,
         endDate: LocalDate
     ): Result<Map<LocalDate, DailyStatEntry>> {
-        val ucCountry = countryCode.uppercase()
-        val zoneId = CountryZoneProvider.getZoneId(ucCountry)
+        val zoneId = CountryZoneProvider.getZoneId(countryCode)
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
         val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
 
-        val cachedStats = dailyStatsCache.getRange(ucCountry, startDate, endDate)
+        val cachedStats = dailyStatsCache.getRange(countryCode, startDate, endDate)
             .filter { (date, entry) -> entry.isFullDay(date, zoneId) }
         val missingDates = datesInRange.filter { !cachedStats.containsKey(it) }
 
@@ -42,7 +41,7 @@ class PriceStatsRepositoryImpl(
         val fetchedStats = try {
             coroutineScope {
                 val deferredResults = missingDates.map { date ->
-                    async { fetchDailyStat(ucCountry, date) }
+                    async { fetchDailyStat(countryCode, date) }
                 }
                 deferredResults.awaitAll().filterNotNull().toMap()
             }
@@ -51,7 +50,7 @@ class PriceStatsRepositoryImpl(
         }
 
         if (fetchedStats.isNotEmpty()) {
-            dailyStatsCache.putBatch(ucCountry, fetchedStats)
+            dailyStatsCache.putBatch(countryCode, fetchedStats)
         }
 
         return Result.success(cachedStats + fetchedStats)

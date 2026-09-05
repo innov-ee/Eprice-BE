@@ -45,14 +45,13 @@ class FileBackedDailyAveragePriceCache(
 
     override fun get(countryCode: String, date: LocalDate): Double? {
         val dateString = date.format(dateFormatter)
-        return cache[countryCode.uppercase()]?.get(dateString)
+        return cache[countryCode]?.get(dateString)
     }
 
     override fun put(countryCode: String, date: LocalDate, averagePrice: Double) {
-        val ucCountryCode = countryCode.uppercase()
         val dateString = date.format(dateFormatter)
 
-        val countryCache = cache.getOrPut(ucCountryCode) { ConcurrentHashMap() }
+        val countryCache = cache.getOrPut(countryCode) { ConcurrentHashMap() }
         countryCache[dateString] = averagePrice
 
         // Save to disk asynchronously.
@@ -66,7 +65,7 @@ class FileBackedDailyAveragePriceCache(
         startDate: LocalDate,
         endDate: LocalDate
     ): Map<LocalDate, Double> {
-        val countryCache = cache[countryCode.uppercase()] ?: return emptyMap()
+        val countryCache = cache[countryCode] ?: return emptyMap()
 
         return countryCache
             .mapKeysNotNull { LocalDate.parse(it.key, dateFormatter) }
