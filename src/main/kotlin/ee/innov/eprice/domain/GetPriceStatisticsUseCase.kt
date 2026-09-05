@@ -51,7 +51,7 @@ class GetPriceStatisticsUseCase(
                 val averagePrice = if (totalCount > 0) totalSum / totalCount else 0.0
 
                 return PriceStatistics(
-                    countryCode = countryCode.uppercase(),
+                    countryCode = countryCode,
                     startDate = startDate.toString(),
                     endDate = endDate.toString(),
                     daysRequested = daysRequested,

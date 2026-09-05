@@ -181,9 +181,8 @@ private val biddingZoneMap: Map<String, String> = mapOf(
  * If the input is already a valid 16-character EIC code, it is returned directly.
  */
 internal fun String.toBiddingZone(): String? {
-    val normalized = this.trim().uppercase()
-    if (normalized.length == 16 && (normalized.startsWith("10Y") || normalized.startsWith("10X") || normalized.startsWith("10Z"))) {
-        return normalized
+    if (this.length == 16 && (this.startsWith("10Y") || this.startsWith("10X") || this.startsWith("10Z"))) {
+        return this
     }
-    return biddingZoneMap[normalized.replace('-', '_')] ?: biddingZoneMap[normalized]
+    return biddingZoneMap[this]
 }

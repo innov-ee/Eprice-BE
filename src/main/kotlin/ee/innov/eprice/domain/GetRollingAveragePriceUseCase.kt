@@ -114,7 +114,7 @@ class GetRollingAveragePriceUseCase(
 
         return Result.success(
             RollingAverage(
-                countryCode = countryCode.uppercase(),
+                countryCode = countryCode,
                 daysRequested = days,
                 daysCalculated = daysCalculated,
                 startDate = startDate,

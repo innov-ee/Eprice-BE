@@ -35,8 +35,7 @@ class EnergyPriceRepositoryImpl(
         end: Instant,
         cacheResults: Boolean,
     ): Result<List<DomainEnergyPrice>> {
-        val normalizedCode = countryCode.trim().uppercase().replace('-', '_')
-        val cacheKey = "${normalizedCode}_${start}_$end"
+        val cacheKey = "${countryCode}_${start}_$end"
 
         val cachedPrices = cache.get(cacheKey)
         if (cachedPrices != null) {
@@ -50,12 +49,12 @@ class EnergyPriceRepositoryImpl(
             monitor?.recordCacheMiss()
         }
 
-        val networkResult = fetchFromNetwork(normalizedCode, start, end)
+        val networkResult = fetchFromNetwork(countryCode, start, end)
 
         if (cacheResults) {
             networkResult.onSuccess { prices ->
                 if (prices.isNotEmpty()) {
-                    val zoneId = CountryZoneProvider.getZoneId(normalizedCode)
+                    val zoneId = CountryZoneProvider.getZoneId(countryCode)
                     val isComplete = prices.isCompleteRange(zoneId, start, end)
                     cache.put(cacheKey, prices, isComplete = isComplete)
                 }

@@ -4,6 +4,12 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
 
+/**
+ * Normalizes country and bidding zone codes (e.g., " ee " -> "EE", "no-1" -> "NO_1").
+ */
+fun String.normalizeCountryCode(): String =
+    this.trim().uppercase().replace('-', '_')
+
 object CountryZoneProvider {
     private val defaultZoneId = ZoneId.of("Europe/Tallinn")
 
@@ -76,8 +82,7 @@ object CountryZoneProvider {
     )
 
     fun getZoneId(countryCode: String): ZoneId =
-        countryZoneMap[countryCode.trim().uppercase().replace('-', '_')]
-            ?: countryZoneMap[countryCode.trim().uppercase()]
+        countryZoneMap[countryCode]
             ?: defaultZoneId
 
     /**

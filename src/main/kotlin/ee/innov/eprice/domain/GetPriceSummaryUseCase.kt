@@ -26,33 +26,32 @@ class GetPriceSummaryUseCase(
     }
 
     suspend fun execute(countryCode: String): Result<PriceSummaryStatistics> {
-        val ucCountry = countryCode.uppercase()
-        val zoneId = CountryZoneProvider.getZoneId(ucCountry)
+        val zoneId = CountryZoneProvider.getZoneId(countryCode)
         val today = LocalDate.now(clock.withZone(zoneId))
         val yesterday = today.minusDays(1)
         val tomorrow = today.plusDays(1)
         val rollingStart = yesterday.minusDays(rollingDays.toLong() - 1)
 
-        val rawStatsMap = priceStatsRepository.getDailyStats(ucCountry, rollingStart, tomorrow)
+        val rawStatsMap = priceStatsRepository.getDailyStats(countryCode, rollingStart, tomorrow)
             .getOrElse { return Result.failure(it) }
 
         val statsMap = rawStatsMap.filter { (date, entry) ->
             entry.isFullDay(date, zoneId)
         }
 
-        val rollingStats = PriceStatistics.compute(ucCountry, statsMap, rollingStart, yesterday, rollingDays)
+        val rollingStats = PriceStatistics.compute(countryCode, statsMap, rollingStart, yesterday, rollingDays)
             ?: return Result.failure(
-                NoDataFoundException("No rolling price data found for $ucCountry between $rollingStart and $yesterday.")
+                NoDataFoundException("No rolling price data found for $countryCode between $rollingStart and $yesterday.")
             )
 
-        val yesterdayStats = PriceStatistics.compute(ucCountry, statsMap, yesterday, yesterday, 1)
+        val yesterdayStats = PriceStatistics.compute(countryCode, statsMap, yesterday, yesterday, 1)
             ?: return Result.failure(
-                NoDataFoundException("No price data found for $ucCountry for yesterday ($yesterday).")
+                NoDataFoundException("No price data found for $countryCode for yesterday ($yesterday).")
             )
 
-        val todayStats = PriceStatistics.compute(ucCountry, statsMap, today, today, 1)
+        val todayStats = PriceStatistics.compute(countryCode, statsMap, today, today, 1)
             ?: return Result.failure(
-                NoDataFoundException("No price data found for $ucCountry for today ($today).")
+                NoDataFoundException("No price data found for $countryCode for today ($today).")
             )
 
         // Check if tomorrow data is available with full day data
@@ -60,12 +59,12 @@ class GetPriceSummaryUseCase(
         val hasTomorrow = tomorrowEntry != null && tomorrowEntry.isFullDay(tomorrow, zoneId)
 
         val tomorrowStats = if (hasTomorrow) {
-            PriceStatistics.compute(ucCountry, statsMap, tomorrow, tomorrow, 1)
+            PriceStatistics.compute(countryCode, statsMap, tomorrow, tomorrow, 1)
         } else null
 
         return Result.success(
             PriceSummaryStatistics(
-                countryCode = ucCountry,
+                countryCode = countryCode,
                 rolling = rollingStats,
                 yesterday = yesterdayStats,
                 today = todayStats,

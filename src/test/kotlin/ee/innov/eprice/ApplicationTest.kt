@@ -229,6 +229,25 @@ class ApplicationTest {
     }
 
     @Test
+    fun `GET prices stats normalizes lowercase country code at route boundary`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val response = client.get("/api/prices/ee/stats?range=yesterday")
+
+                assertEquals(HttpStatusCode.OK, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""countryCode":"EE""""))
+            }
+        )
+    }
+
+    @Test
     fun `GET prices stats for today should return 200 OK with statistics`() {
         runPriceApiTest(
             engineHandler = createMockEngineHandler(

@@ -16,13 +16,23 @@ class CountryZoneProviderTest {
     private val tallinnZone = ZoneId.of("Europe/Tallinn")
 
     @Test
+    fun `normalizeCountryCode handles whitespace case and hyphens`() {
+        assertEquals("EE", "ee".normalizeCountryCode())
+        assertEquals("EE", "  EE  ".normalizeCountryCode())
+        assertEquals("DE_LU", "de-lu".normalizeCountryCode())
+        assertEquals("DE_LU", "DE-LU".normalizeCountryCode())
+        assertEquals("IT_NORD", "it-nord".normalizeCountryCode())
+        assertEquals("NO_1", "no-1".normalizeCountryCode())
+        assertEquals("SE_1", "se_1".normalizeCountryCode())
+    }
+
+    @Test
     fun `getZoneId maps known countries correctly and defaults to Europe Tallinn`() {
         assertEquals(ZoneId.of("Europe/Tallinn"), CountryZoneProvider.getZoneId("EE"))
         assertEquals(ZoneId.of("Europe/Helsinki"), CountryZoneProvider.getZoneId("FI"))
         assertEquals(ZoneId.of("Europe/Riga"), CountryZoneProvider.getZoneId("LV"))
         assertEquals(ZoneId.of("Europe/Vilnius"), CountryZoneProvider.getZoneId("LT"))
         assertEquals(ZoneId.of("Europe/Berlin"), CountryZoneProvider.getZoneId("DE"))
-        assertEquals(ZoneId.of("Europe/Berlin"), CountryZoneProvider.getZoneId("DE-LU"))
         assertEquals(ZoneId.of("Europe/Berlin"), CountryZoneProvider.getZoneId("DE_LU"))
         assertEquals(ZoneId.of("Europe/Paris"), CountryZoneProvider.getZoneId("FR"))
         assertEquals(ZoneId.of("Europe/Stockholm"), CountryZoneProvider.getZoneId("SE3"))
@@ -30,7 +40,6 @@ class CountryZoneProviderTest {
         assertEquals(ZoneId.of("Europe/Lisbon"), CountryZoneProvider.getZoneId("PT"))
         assertEquals(ZoneId.of("Europe/London"), CountryZoneProvider.getZoneId("UK"))
         assertEquals(ZoneId.of("Europe/Dublin"), CountryZoneProvider.getZoneId("IE"))
-        assertEquals(ZoneId.of("Europe/Rome"), CountryZoneProvider.getZoneId("IT-NORD"))
         assertEquals(ZoneId.of("Europe/Rome"), CountryZoneProvider.getZoneId("IT_NORD"))
         assertEquals(ZoneId.of("Europe/Tallinn"), CountryZoneProvider.getZoneId("UNKNOWN"))
     }

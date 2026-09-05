@@ -260,7 +260,7 @@ class EnergyPriceRepositoryImplTest {
     }
 
     @Test
-    fun `getPrices normalizes countryCode in cache key across case and whitespace variations`() = runBlocking<Unit> {
+    fun `getPrices caches data and reuses cache across subsequent calls`() = runBlocking<Unit> {
         var networkCallCount = 0
         val zoneId = CountryZoneProvider.getZoneId("DE")
         val d1 = LocalDate.of(2026, 8, 22)
@@ -307,29 +307,24 @@ class EnergyPriceRepositoryImplTest {
             cache = inMemoryCache
         )
 
-        // First call with lowercase "de"
-        val result1 = repository.getPrices("de", start, end, cacheResults = true)
+        // First call with "DE"
+        val result1 = repository.getPrices("DE", start, end, cacheResults = true)
         assertTrue(result1.isSuccess)
         assertEquals(1, networkCallCount)
 
-        // Second call with whitespace " DE " should hit cache
-        val result2 = repository.getPrices(" DE ", start, end, cacheResults = true)
+        // Second call with "DE" should hit cache
+        val result2 = repository.getPrices("DE", start, end, cacheResults = true)
         assertTrue(result2.isSuccess)
         assertEquals(1, networkCallCount)
 
-        // Third call with uppercase "DE" should also hit cache
-        val result3 = repository.getPrices("DE", start, end, cacheResults = true)
+        // Third call with new country code "DE_LU" fetches from network
+        val result3 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result3.isSuccess)
-        assertEquals(1, networkCallCount)
-
-        // Fourth call with hyphen "DE-LU" should hit cache for DE_LU
-        val result4 = repository.getPrices("DE-LU", start, end, cacheResults = true)
-        assertTrue(result4.isSuccess)
         assertEquals(2, networkCallCount)
 
-        // Fifth call with underscore "DE_LU" should hit cache
-        val result5 = repository.getPrices("DE_LU", start, end, cacheResults = true)
-        assertTrue(result5.isSuccess)
+        // Fourth call with "DE_LU" should hit cache
+        val result4 = repository.getPrices("DE_LU", start, end, cacheResults = true)
+        assertTrue(result4.isSuccess)
         assertEquals(2, networkCallCount)
     }
 }

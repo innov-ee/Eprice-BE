@@ -43,14 +43,14 @@ class InMemoryDailyStatsCache : DailyStatsCache {
     val store = ConcurrentHashMap<String, ConcurrentHashMap<LocalDate, DailyStatEntry>>()
 
     override fun get(countryCode: String, date: LocalDate): DailyStatEntry? =
-        store[countryCode.uppercase()]?.get(date)
+        store[countryCode]?.get(date)
 
     override fun put(countryCode: String, date: LocalDate, stats: DailyStatEntry) {
-        store.getOrPut(countryCode.uppercase()) { ConcurrentHashMap() }[date] = stats
+        store.getOrPut(countryCode) { ConcurrentHashMap() }[date] = stats
     }
 
     override fun putBatch(countryCode: String, entries: Map<LocalDate, DailyStatEntry>) {
-        val countryMap = store.getOrPut(countryCode.uppercase()) { ConcurrentHashMap() }
+        val countryMap = store.getOrPut(countryCode) { ConcurrentHashMap() }
         countryMap.putAll(entries)
     }
 
@@ -59,7 +59,7 @@ class InMemoryDailyStatsCache : DailyStatsCache {
         startDate: LocalDate,
         endDate: LocalDate
     ): Map<LocalDate, DailyStatEntry> {
-        val countryMap = store[countryCode.uppercase()] ?: return emptyMap()
+        val countryMap = store[countryCode] ?: return emptyMap()
         return countryMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
     }
 
@@ -72,10 +72,10 @@ class InMemoryDailyAveragePriceCache : DailyAveragePriceCache {
     val store = ConcurrentHashMap<String, ConcurrentHashMap<LocalDate, Double>>()
 
     override fun get(countryCode: String, date: LocalDate): Double? =
-        store[countryCode.uppercase()]?.get(date)
+        store[countryCode]?.get(date)
 
     override fun put(countryCode: String, date: LocalDate, averagePrice: Double) {
-        store.getOrPut(countryCode.uppercase()) { ConcurrentHashMap() }[date] = averagePrice
+        store.getOrPut(countryCode) { ConcurrentHashMap() }[date] = averagePrice
     }
 
     override fun getRange(
@@ -83,7 +83,7 @@ class InMemoryDailyAveragePriceCache : DailyAveragePriceCache {
         startDate: LocalDate,
         endDate: LocalDate
     ): Map<LocalDate, Double> {
-        val countryMap = store[countryCode.uppercase()] ?: return emptyMap()
+        val countryMap = store[countryCode] ?: return emptyMap()
         return countryMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
     }
 
