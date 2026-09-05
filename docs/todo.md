@@ -1,6 +1,7 @@
 # TODO
 - Persist cache over restarts (e.g mount outside of container)
 - Requests for tomorrows prices/stats can miss cache before noon, and this means they fall thru to actual requests every time - undesired, improve!
+- stats requests in ranges where data is missing always trigger outgoing requests - undesired, improve!
 - Consider removing Result wrappers
 
 # Nice to have
