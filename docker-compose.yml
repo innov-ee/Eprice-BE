@@ -8,8 +8,12 @@ services:
     ports:
       - "8080:8080"
       - "5005:5005"
+    environment:
+      - CACHE_DIR=/app/data
     env_file:
       - .env
+    volumes:
+      - ./data:/app/data
     # Override the Dockerfile's entrypoint to enable the JVM debugger.
     # basically does `EXPOSE 5005` in the dockerfile, but we dont want that there as that goes to prod.
     entrypoint: [ "java", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005", "-jar", "app.jar" ]
