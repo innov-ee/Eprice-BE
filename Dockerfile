@@ -12,8 +12,12 @@ RUN chmod +x ./gradlew && ./gradlew buildFatJar -x test --no-daemon
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Non-root user for security
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Non-root user for security and cache directory setup
+RUN addgroup -S appgroup && \
+    adduser -S appuser -G appgroup && \
+    mkdir -p /app/data && \
+    chown -R appuser:appgroup /app
+
 USER appuser
 
 # Copy the built JAR from the build stage

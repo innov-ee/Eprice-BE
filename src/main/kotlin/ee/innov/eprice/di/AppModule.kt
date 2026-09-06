@@ -31,6 +31,18 @@ import io.ktor.client.plugins.logging.Logging
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+
+private fun resolveCachePath(fileName: String): Path {
+    val cacheDir = System.getenv("CACHE_DIR") ?: "."
+    val dir = Paths.get(cacheDir)
+    if (!Files.exists(dir)) {
+        Files.createDirectories(dir)
+    }
+    return dir.resolve(fileName)
+}
 
 val appModule = module {
 
@@ -100,15 +112,15 @@ val appModule = module {
     }
 
     single<PriceCache> {
-        InMemoryPriceCache()
+        InMemoryPriceCache(cacheFile = resolveCachePath("eprice-cache.json"))
     }
 
     single<DailyAveragePriceCache> {
-        FileBackedDailyAveragePriceCache()
+        FileBackedDailyAveragePriceCache(cacheFile = resolveCachePath("daily-average-cache.json"))
     }
 
     single<DailyStatsCache> {
-        FileBackedDailyStatsCache()
+        FileBackedDailyStatsCache(cacheFile = resolveCachePath("daily-stats-cache.json"))
     }
 
     single<EnergyPriceRepository> {
