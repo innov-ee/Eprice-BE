@@ -5,6 +5,7 @@ import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.basic
+import org.koin.ktor.ext.inject
 import java.security.MessageDigest
 
 const val AUTH_BOOTSTRAP = "bootstrap-auth"
@@ -12,6 +13,8 @@ const val AUTH_OPERATIONAL = "operational-auth"
 const val AUTH_ADMIN_BASIC = "admin-browser-auth"
 
 fun Application.configureSecurity() {
+    val keyRotationService by inject<KeyRotationService>()
+
     val bootstrapKey = System.getenv("BOOTSTRAP_KEY") ?: "dev-bootstrap-key-replace-me"
     val adminUser = System.getenv("ADMIN_USERNAME") ?: "admin"
     val adminPass = System.getenv("ADMIN_PASSWORD") ?: "dev-admin-password"
@@ -33,7 +36,7 @@ fun Application.configureSecurity() {
         apiKey(AUTH_OPERATIONAL) {
             headerName = "X-API-Key"
             validate { key ->
-                if (KeyRotationService.isValid(key)) ApiKeyPrincipal("app-operational") else null
+                if (keyRotationService.isValid(key)) ApiKeyPrincipal("app-operational") else null
             }
         }
 

@@ -48,6 +48,7 @@ fun Route.priceRoutes() {
     val dailyAveragePriceCache: DailyAveragePriceCache by inject()
     val dailyStatsCache: DailyStatsCache by inject()
     val monitor: ServiceMonitor by inject()
+    val keyRotationService: KeyRotationService by inject()
 
     // Interceptor to count all incoming requests
     intercept(ApplicationCallPipeline.Plugins) {
@@ -63,7 +64,7 @@ fun Route.priceRoutes() {
     // --- Bootstrap-Protected Route (X-Bootstrap-Key) ---
     authenticate(AUTH_BOOTSTRAP) {
         get("/api/v1/keys") {
-            val info = KeyRotationService.getKeyInfo()
+            val info = keyRotationService.getKeyInfo()
             call.respond(
                 HttpStatusCode.OK, mapOf(
                     "operational_key" to info.operationalKey,

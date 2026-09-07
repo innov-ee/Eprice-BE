@@ -20,6 +20,7 @@ import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
+import ee.innov.eprice.security.KeyRotationService
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpRequestRetry
@@ -47,6 +48,8 @@ private fun resolveCachePath(fileName: String): Path {
 val appModule = module {
 
     single { ServiceMonitor() }
+
+    single { KeyRotationService() }
 
     single {
         val clientLogger = LoggerFactory.getLogger("ee.innov.eprice.httpclient")

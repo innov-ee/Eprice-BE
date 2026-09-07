@@ -439,7 +439,7 @@ class ApplicationTest {
 
         val response = client.get("/api/v1/keys")
         assertEquals(HttpStatusCode.Unauthorized, response.status)
-        assertTrue(response.bodyAsText().contains("Missing required header: X-Bootstrap-Key"))
+        assertTrue(response.bodyAsText().contains(""""error":"Unauthorized""""))
     }
 
     @Test
@@ -452,7 +452,7 @@ class ApplicationTest {
             header("X-Bootstrap-Key", "wrong-bootstrap-key")
         }
         assertEquals(HttpStatusCode.Unauthorized, response.status)
-        assertTrue(response.bodyAsText().contains("Invalid key in header: X-Bootstrap-Key"))
+        assertTrue(response.bodyAsText().contains(""""error":"Unauthorized""""))
     }
 
     @Test
@@ -503,7 +503,7 @@ class ApplicationTest {
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
             testBlock = {
-                val validKey = KeyRotationService.getKeyInfo().operationalKey
+                val validKey = KeyRotationService().getKeyInfo().operationalKey
                 val response = client.get("/api/prices") {
                     header("X-API-Key", validKey)
                 }
@@ -578,7 +578,7 @@ class ApplicationTest {
             module(allowKoinOverrides = true)
         }
 
-        val validApiKey = KeyRotationService.getKeyInfo().operationalKey
+        val validApiKey = KeyRotationService().getKeyInfo().operationalKey
         val response = client.post("/api/cache/clear") {
             header("X-API-Key", validApiKey)
         }
@@ -705,7 +705,7 @@ class ApplicationTest {
             )
         }
 
-        val validApiKey = KeyRotationService.getKeyInfo().operationalKey
+        val validApiKey = KeyRotationService().getKeyInfo().operationalKey
         val adminAuthHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:dev-admin-password".toByteArray())
 
         // Create an authenticated client that sends X-API-Key and Admin Basic Auth by default

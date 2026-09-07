@@ -19,23 +19,19 @@ class ApiKeyAuthenticationProvider internal constructor(
     private val validate: suspend (String) -> Principal? = config.validateFunction
 
     override suspend fun onAuthenticate(context: AuthenticationContext) {
-        val call = context.call
-        val headerValue = call.request.headers[headerName]
+        val headerValue = context.call.request.headers[headerName]
+        val principal = headerValue?.let { validate(it) }
 
-        if (headerValue == null) {
-            context.challenge("ApiKeyAuth", AuthenticationFailedCause.NoCredentials) { challenge, appCall ->
-                appCall.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Missing required header: $headerName"))
-                challenge.complete()
-            }
-            return
-        }
-
-        val principal = validate(headerValue)
         if (principal != null) {
             context.principal(principal)
         } else {
-            context.challenge("ApiKeyAuth", AuthenticationFailedCause.InvalidCredentials) { challenge, appCall ->
-                appCall.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid key in header: $headerName"))
+            val cause = if (headerValue == null) {
+                AuthenticationFailedCause.NoCredentials
+            } else {
+                AuthenticationFailedCause.InvalidCredentials
+            }
+            context.challenge("ApiKeyAuth", cause) { challenge, appCall ->
+                appCall.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Unauthorized"))
                 challenge.complete()
             }
         }
