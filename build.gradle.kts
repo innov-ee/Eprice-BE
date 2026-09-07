@@ -73,6 +73,11 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // env variables for unit tests to pass
+    environment("BOOTSTRAP_KEYS", "test-bootstrap-key")
+    environment("MASTER_SECRET", "test-master-secret-at-least-32-bytes-long")
+    environment("ADMIN_USERNAME", "admin")
+    environment("ADMIN_PASSWORD", "password")
     testLogging {
         events("passed", "skipped", "failed")
     }

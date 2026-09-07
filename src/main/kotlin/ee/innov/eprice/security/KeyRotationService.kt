@@ -1,5 +1,6 @@
 package ee.innov.eprice.security
 
+import ee.innov.eprice.util.getEnv
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Clock
@@ -14,7 +15,7 @@ data class KeyRotationInfo(
 )
 
 class KeyRotationService(
-    private val masterSecret: ByteArray = (System.getenv("MASTER_SECRET") ?: "dev-eprice-master-secret-change-in-production-32b")
+    private val masterSecret: ByteArray = getEnv("MASTER_SECRET")
         .toByteArray(StandardCharsets.UTF_8),
     private val clock: Clock = Clock.systemUTC()
 ) {

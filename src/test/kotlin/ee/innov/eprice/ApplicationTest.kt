@@ -462,7 +462,7 @@ class ApplicationTest {
         }
 
         val response = client.get("/api/v1/keys") {
-            header("X-Bootstrap-Key", "dev-bootstrap-key-replace-me")
+            header("X-Bootstrap-Key", "test-bootstrap-key")
         }
         assertEquals(HttpStatusCode.OK, response.status)
         val body = response.bodyAsText()
@@ -522,7 +522,7 @@ class ApplicationTest {
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
             testBlock = {
-                val adminAuth = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:dev-admin-password".toByteArray())
+                val adminAuth = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:password".toByteArray())
                 val response = client.get("/api/prices") {
                     header("Authorization", adminAuth)
                 }
@@ -591,7 +591,7 @@ class ApplicationTest {
             module(allowKoinOverrides = true)
         }
 
-        val adminAuthHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:dev-admin-password".toByteArray())
+        val adminAuthHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:password".toByteArray())
         val response = client.post("/api/cache/clear") {
             header("Authorization", adminAuthHeader)
         }
@@ -706,7 +706,7 @@ class ApplicationTest {
         }
 
         val validApiKey = KeyRotationService().getKeyInfo().operationalKey
-        val adminAuthHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:dev-admin-password".toByteArray())
+        val adminAuthHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:password".toByteArray())
 
         // Create an authenticated client that sends X-API-Key and Admin Basic Auth by default
         val authClient = createClient {
