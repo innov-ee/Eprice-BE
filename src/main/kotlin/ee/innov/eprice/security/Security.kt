@@ -1,5 +1,6 @@
 package ee.innov.eprice.security
 
+import ee.innov.eprice.util.getEnvList
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -15,7 +16,7 @@ const val AUTH_ADMIN_BASIC = "admin-browser-auth"
 fun Application.configureSecurity() {
     val keyRotationService by inject<KeyRotationService>()
 
-    val bootstrapKey = System.getenv("BOOTSTRAP_KEY") ?: "dev-bootstrap-key-replace-me"
+    val bootstrapKeys = getEnvList("BOOTSTRAP_KEYS", default = listOf("dev-bootstrap-key-replace-me"))
     val adminUser = System.getenv("ADMIN_USERNAME") ?: "admin"
     val adminPass = System.getenv("ADMIN_PASSWORD") ?: "dev-admin-password"
 
@@ -24,11 +25,11 @@ fun Application.configureSecurity() {
         apiKey(AUTH_BOOTSTRAP) {
             headerName = "X-Bootstrap-Key"
             validate { key ->
-                val keyMatches = MessageDigest.isEqual(
-                    key.toByteArray(Charsets.UTF_8),
-                    bootstrapKey.toByteArray(Charsets.UTF_8)
-                )
-                if (keyMatches) ApiKeyPrincipal("app-bootstrap") else null
+                val keyBytes = key.toByteArray(Charsets.UTF_8)
+                val matches = bootstrapKeys.any { validKey ->
+                    MessageDigest.isEqual(keyBytes, validKey.toByteArray(Charsets.UTF_8))
+                }
+                if (matches) ApiKeyPrincipal("app-bootstrap") else null
             }
         }
 
