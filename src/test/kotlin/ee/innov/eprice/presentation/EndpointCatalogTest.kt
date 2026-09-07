@@ -10,9 +10,9 @@ class EndpointCatalogTest {
     @Test
     fun `endpoints contains auth keys endpoint with default header and samples`() {
         val endpoints = EndpointCatalog.endpoints
-        val keysEndpoint = endpoints.find { it.path == "/api/v1/keys" }
+        val keysEndpoint = endpoints.find { it.path == "/api/v1/auth/keys" }
 
-        assertNotNull(keysEndpoint, "Keys endpoint /api/v1/keys should be present in EndpointCatalog")
+        assertNotNull(keysEndpoint, "Keys endpoint /api/v1/auth/keys should be present in EndpointCatalog")
         assertEquals("GET", keysEndpoint.method)
         assertEquals(EndpointCategory.AUTHENTICATION, keysEndpoint.category)
 

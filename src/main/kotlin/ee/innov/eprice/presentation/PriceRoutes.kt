@@ -62,8 +62,9 @@ fun Route.priceRoutes() {
     }
 
     // --- Bootstrap-Protected Route (X-Bootstrap-Key) ---
+    // ngingx is configured to have harder rate limits on /api/v*/auth paths.
     authenticate(AUTH_BOOTSTRAP) {
-        get("/api/v1/keys") {
+        get("/api/v1/auth/keys") {
             val info = keyRotationService.getKeyInfo()
             call.respond(
                 HttpStatusCode.OK, mapOf(

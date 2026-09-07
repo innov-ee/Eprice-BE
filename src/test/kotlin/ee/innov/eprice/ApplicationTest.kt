@@ -383,7 +383,7 @@ class ApplicationTest {
                 val body = response.bodyAsText()
                 assertTrue(body.contains(""""path":"/monitor""""))
                 assertTrue(body.contains(""""path":"/api/prices/{countryCode?}""""))
-                assertTrue(body.contains(""""path":"/api/v1/keys""""))
+                assertTrue(body.contains(""""path":"/api/v1/auth/keys""""))
                 assertTrue(body.contains(""""category":"Monitoring & Diagnostics""""))
                 assertTrue(body.contains(""""category":"Authentication & Keys""""))
                 assertTrue(body.contains(""""headers":{"X-Bootstrap-Key":"test-bootstrap-key"}"""))
@@ -441,7 +441,7 @@ class ApplicationTest {
             module(allowKoinOverrides = true)
         }
 
-        val response = client.get("/api/v1/keys")
+        val response = client.get("/api/v1/auth/keys")
         assertEquals(HttpStatusCode.Unauthorized, response.status)
         assertTrue(response.bodyAsText().contains(""""error":"Unauthorized""""))
     }
@@ -452,7 +452,7 @@ class ApplicationTest {
             module(allowKoinOverrides = true)
         }
 
-        val response = client.get("/api/v1/keys") {
+        val response = client.get("/api/v1/auth/keys") {
             header("X-Bootstrap-Key", "wrong-bootstrap-key")
         }
         assertEquals(HttpStatusCode.Unauthorized, response.status)
@@ -465,7 +465,7 @@ class ApplicationTest {
             module(allowKoinOverrides = true)
         }
 
-        val response = client.get("/api/v1/keys") {
+        val response = client.get("/api/v1/auth/keys") {
             header("X-Bootstrap-Key", "test-bootstrap-key")
         }
         assertEquals(HttpStatusCode.OK, response.status)

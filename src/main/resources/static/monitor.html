@@ -970,9 +970,9 @@
                 ? { ...sample.headers }
                 : { ...(item.headers || {}) };
 
-            // If an operational key was fetched and this request doesn't have custom headers and is not /api/v1/keys,
+            // If an operational key was fetched and this request doesn't have custom headers and is not /api/v1/auth/keys,
             // populate X-API-Key so the request works cleanly without triggering browser Basic Auth prompts
-            if (currentOperationalKey && !path.startsWith("/api/v1/keys") && Object.keys(sampleHeaders).length === 0) {
+            if (currentOperationalKey && !path.startsWith("/api/v1/auth/keys") && Object.keys(sampleHeaders).length === 0) {
                 sampleHeaders = { "X-API-Key": currentOperationalKey };
             }
 
@@ -1008,8 +1008,8 @@
             const parsed = parseHeaders(headersInput.value);
             const hasBootstrapHeader = Object.keys(parsed).some(k => k.toLowerCase() === "x-bootstrap-key");
 
-            // If the user changed the URL away from /api/v1/keys, do not keep X-Bootstrap-Key
-            if (hasBootstrapHeader && !path.startsWith("/api/v1/keys")) {
+            // If the user changed the URL away from /api/v1/auth/keys, do not keep X-Bootstrap-Key
+            if (hasBootstrapHeader && !path.startsWith("/api/v1/auth/keys")) {
                 headersInput.value = "";
                 lastDefaultHeadersString = "";
                 updateResetButtonVisibility();
@@ -1066,7 +1066,7 @@
 
                 try {
                     const parsed = JSON.parse(text);
-                    if (path.startsWith("/api/v1/keys") && parsed && parsed.operational_key) {
+                    if (path.startsWith("/api/v1/auth/keys") && parsed && parsed.operational_key) {
                         currentOperationalKey = parsed.operational_key;
                     }
                     const formatted = JSON.stringify(parsed, null, 2);

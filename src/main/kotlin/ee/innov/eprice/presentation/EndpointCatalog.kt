@@ -52,7 +52,7 @@ object EndpointCatalog {
                 add(
                     EndpointSample(
                         label = "Fetch Key",
-                        path = "/api/v1/keys",
+                        path = "/api/v1/auth/keys",
                         description = if (rawBootstrapKeys.isNotBlank()) "Default first key from BOOTSTRAP_KEYS: $defaultBootstrapKey" else null,
                         headers = defaultHeaders
                     )
@@ -62,7 +62,7 @@ object EndpointCatalog {
                         add(
                             EndpointSample(
                                 label = "Fetch Key (Key ${index + 2})",
-                                path = "/api/v1/keys",
+                                path = "/api/v1/auth/keys",
                                 description = "Configured alternate key: $key",
                                 headers = mapOf("X-Bootstrap-Key" to key)
                             )
@@ -72,7 +72,7 @@ object EndpointCatalog {
                 add(
                     EndpointSample(
                         label = "Invalid Key",
-                        path = "/api/v1/keys",
+                        path = "/api/v1/auth/keys",
                         description = "Tests 401 Unauthorized using an invalid bootstrap key",
                         headers = mapOf("X-Bootstrap-Key" to "invalid-bootstrap-key")
                     )
@@ -83,7 +83,7 @@ object EndpointCatalog {
                 EndpointDoc(
                     category = EndpointCategory.AUTHENTICATION,
                     method = "GET",
-                    path = "/api/v1/keys",
+                    path = "/api/v1/auth/keys",
                     description = authDescription,
                     samples = authSamples,
                     headers = defaultHeaders

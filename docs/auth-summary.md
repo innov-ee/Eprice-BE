@@ -24,7 +24,7 @@ Relying on auth headers and https:
 ### Implementation
 
 #### VPS
-Nginx gets different rules per request path
+Nginx gets different rate limit rules per request path
 
 #### Ktor server
 - specify defaults in env: BOOTSTRAP_KEYS, ADMIN_USERNAME, ADMIN_PASSWORD
@@ -33,12 +33,7 @@ Nginx gets different rules per request path
     - Need to implement `AuthenticationProvider`, which encapsulates reading the header and then either authenticating the call for further processing, or responding with failure.
   - Register `basic` auth (i.e. the login dialog) for admin access.
   - Equality is done using `messageDigest.isEqual` to avoid timing based attacks. (in standard equals: the longer it takes, the longer substring match you have)
-- wrap Routes in `authenticate` blocks naming which auth strategy to support among the above.
+- wrap Routes in `authenticate()` blocks, declaring which auth strategy from above is required.
 - Add KeyRotationService to encapsulate deriving and testing keys from master keys.
   - A key is generated from 2 seeds: A) current time bucket (ie the 14d period) and B) the master key
   - whenever a request comes in the service regenerates the key and compares it (acceptable)
-
-
-### Problems:
-- Change admin panel to allow spcifiying bootstrap key header in the request. and prefill it with current bootstrap key. (prehaps change the catalog to allow listing headers, that would surface auth header also, dunno)
-> TODO: i dont like the coupling (nginx has to know about service internals) it brings, re think routes to simplify, or unify limiting, or remove it.
