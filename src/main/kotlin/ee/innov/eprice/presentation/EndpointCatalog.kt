@@ -1,12 +1,14 @@
 package ee.innov.eprice.presentation
 
+import ee.innov.eprice.util.getEnvList
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class EndpointSample(
     val label: String,
     val path: String,
-    val description: String? = null
+    val description: String? = null,
+    val headers: Map<String, String> = emptyMap()
 )
 
 @Serializable
@@ -15,7 +17,8 @@ data class EndpointDoc(
     val method: String,
     val path: String,
     val description: String,
-    val samples: List<EndpointSample>
+    val samples: List<EndpointSample>,
+    val headers: Map<String, String> = emptyMap()
 )
 
 object EndpointCategory {
@@ -27,16 +30,64 @@ object EndpointCategory {
 }
 
 object EndpointCatalog {
-    val endpoints: List<EndpointDoc> = listOf(
-        EndpointDoc(
-            category = EndpointCategory.AUTHENTICATION,
-            method = "GET",
-            path = "/api/v1/keys",
-            description = "Fetches dynamic operational API key using X-Bootstrap-Key header.",
-            samples = listOf(
-                EndpointSample(label = "Fetch Key", path = "/api/v1/keys")
-            )
-        ),
+    val endpoints: List<EndpointDoc>
+        get() {
+            val rawBootstrapKeys = System.getenv("BOOTSTRAP_KEYS") ?: ""
+            val bootstrapKeys = getEnvList("BOOTSTRAP_KEYS", default = emptyList())
+            val defaultBootstrapKey = bootstrapKeys.firstOrNull().orEmpty()
+            val defaultHeaders = if (defaultBootstrapKey.isNotEmpty()) {
+                mapOf("X-Bootstrap-Key" to defaultBootstrapKey)
+            } else {
+                emptyMap()
+            }
+
+            val authDescription = buildString {
+                append("Fetches dynamic operational API key using X-Bootstrap-Key header.")
+                if (rawBootstrapKeys.isNotBlank()) {
+                    append(" Configured BOOTSTRAP_KEYS: $rawBootstrapKeys")
+                }
+            }
+
+            val authSamples = buildList {
+                add(
+                    EndpointSample(
+                        label = "Fetch Key",
+                        path = "/api/v1/keys",
+                        description = if (rawBootstrapKeys.isNotBlank()) "Default first key from BOOTSTRAP_KEYS: $defaultBootstrapKey" else null,
+                        headers = defaultHeaders
+                    )
+                )
+                if (bootstrapKeys.size > 1) {
+                    bootstrapKeys.drop(1).forEachIndexed { index, key ->
+                        add(
+                            EndpointSample(
+                                label = "Fetch Key (Key ${index + 2})",
+                                path = "/api/v1/keys",
+                                description = "Configured alternate key: $key",
+                                headers = mapOf("X-Bootstrap-Key" to key)
+                            )
+                        )
+                    }
+                }
+                add(
+                    EndpointSample(
+                        label = "Invalid Key",
+                        path = "/api/v1/keys",
+                        description = "Tests 401 Unauthorized using an invalid bootstrap key",
+                        headers = mapOf("X-Bootstrap-Key" to "invalid-bootstrap-key")
+                    )
+                )
+            }
+
+            return listOf(
+                EndpointDoc(
+                    category = EndpointCategory.AUTHENTICATION,
+                    method = "GET",
+                    path = "/api/v1/keys",
+                    description = authDescription,
+                    samples = authSamples,
+                    headers = defaultHeaders
+                ),
         EndpointDoc(
             category = EndpointCategory.MONITORING,
             method = "GET",
@@ -129,4 +180,5 @@ object EndpointCatalog {
             )
         )
     )
+    }
 }

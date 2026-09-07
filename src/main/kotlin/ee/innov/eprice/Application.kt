@@ -54,6 +54,9 @@ fun Application.module(
     install(CORS) {
         anyHost()
         allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Authorization)
+        allowHeader("X-Bootstrap-Key")
+        allowHeader("X-API-Key")
     }
     install(XForwardedHeaders)
 

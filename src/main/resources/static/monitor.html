@@ -472,6 +472,100 @@
             border-color: var(--accent-blue);
         }
 
+        /* Headers Bar */
+        .viewer-headers-bar {
+            padding: 10px 16px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .headers-bar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .headers-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .headers-hint {
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .headers-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-link {
+            background: none;
+            border: none;
+            color: var(--accent-blue);
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .btn-link:hover {
+            color: var(--accent-blue-hover);
+        }
+
+        .headers-input {
+            width: 100%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            resize: vertical;
+            outline: none;
+            box-sizing: border-box;
+            min-height: 44px;
+        }
+
+        .headers-input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .endpoint-headers-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .headers-tag {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .endpoint-headers-info code {
+            font-family: var(--font-mono);
+            background: var(--bg-primary);
+            border: 1px solid var(--card-border);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--accent-blue);
+            font-size: 0.75rem;
+            word-break: break-all;
+        }
+
         .viewer-meta {
             display: flex;
             align-items: center;
@@ -659,6 +753,20 @@
                         </button>
                     </div>
 
+                    <div class="viewer-headers-bar" id="viewerHeadersBar">
+                        <div class="headers-bar-header">
+                            <label for="customHeadersInput" class="headers-label">
+                                <span>Request Headers</span>
+                                <span class="headers-hint">(Header: Value per line, editable)</span>
+                            </label>
+                            <div class="headers-actions">
+                                <button type="button" class="btn-link" onclick="clearHeadersInput()">Clear</button>
+                                <button type="button" class="btn-link" id="resetHeadersBtn" onclick="resetDefaultHeaders()" style="display: none;">Reset</button>
+                            </div>
+                        </div>
+                        <textarea id="customHeadersInput" class="headers-input" rows="2" placeholder="Header: Value (e.g. X-Bootstrap-Key: key)"></textarea>
+                    </div>
+
                     <div class="viewer-meta" id="viewerMeta" style="display: none;">
                         <span id="metaStatus" class="meta-pill status-2xx">200 OK</span>
                         <span id="metaLatency">0 ms</span>
@@ -676,6 +784,10 @@
     <script>
         let autoRefreshTimer = null;
         let lastRawJsonResponse = "";
+        let currentCatalog = [];
+        let currentMethod = "GET";
+        let lastDefaultHeadersString = "";
+        let currentOperationalKey = "";
 
         // 1. Fetch & Render Catalog
         async function loadCatalog() {
@@ -694,6 +806,7 @@
         }
 
         function renderCatalog(catalog) {
+            currentCatalog = catalog || [];
             const container = document.getElementById("catalogContent");
             if (!catalog || catalog.length === 0) {
                 container.innerHTML = '<div class="empty-state">No endpoints found.</div>';
@@ -702,27 +815,39 @@
 
             // Group by category
             const grouped = {};
-            catalog.forEach(item => {
+            currentCatalog.forEach((item, index) => {
                 const cat = item.category || "General";
                 if (!grouped[cat]) grouped[cat] = [];
-                grouped[cat].push(item);
+                grouped[cat].push({ item, index });
             });
 
             let html = "";
-            for (const [category, items] of Object.entries(grouped)) {
+            for (const [category, entries] of Object.entries(grouped)) {
                 html += `
                     <div class="category-group">
                         <div class="category-header">${escapeHtml(category)}</div>
                         <div class="endpoint-list">
                 `;
 
-                items.forEach(item => {
+                entries.forEach(({ item, index: itemIdx }) => {
                     const itemMethod = item.method || "GET";
-                    const samplesHtml = (item.samples || []).map(sample => `
-                        <button class="sample-pill" onclick="tryEndpoint('${escapeHtml(sample.path)}', '${itemMethod}', this)">
-                            <span>▶</span> ${escapeHtml(sample.label)}
-                        </button>
-                    `).join("");
+                    const samplesHtml = (item.samples || []).map((sample, sampleIdx) => {
+                        const titleAttr = sample.description ? `title="${escapeHtml(sample.description)}"` : "";
+                        return `
+                            <button class="sample-pill" ${titleAttr} onclick="selectSample(${itemIdx}, ${sampleIdx}, this)">
+                                <span>▶</span> ${escapeHtml(sample.label)}
+                            </button>
+                        `;
+                    }).join("");
+
+                    const itemHeaders = item.headers || {};
+                    const headersKeys = Object.keys(itemHeaders);
+                    const headersHtml = headersKeys.length > 0 ? `
+                        <div class="endpoint-headers-info">
+                            <span class="headers-tag">Headers:</span>
+                            ${headersKeys.map(k => `<code>${escapeHtml(k)}: ${escapeHtml(itemHeaders[k])}</code>`).join(" ")}
+                        </div>
+                    ` : "";
 
                     html += `
                         <div class="endpoint-item">
@@ -731,6 +856,7 @@
                                 <span class="endpoint-path">${escapeHtml(item.path)}</span>
                             </div>
                             <div class="endpoint-desc">${escapeHtml(item.description || "")}</div>
+                            ${headersHtml}
                             ${samplesHtml ? `
                                 <div class="samples-wrap">
                                     <span class="samples-label">Samples:</span>
@@ -822,24 +948,85 @@
         }
 
         // 3. In-Page Endpoint Execution & Inspection
+        function selectSample(itemIdx, sampleIdx, buttonEl) {
+            document.querySelectorAll(".sample-pill").forEach(el => el.classList.remove("active"));
+            if (buttonEl) {
+                buttonEl.classList.add("active");
+            }
+
+            const item = currentCatalog[itemIdx];
+            if (!item) return;
+            const sample = (item.samples || [])[sampleIdx];
+            if (!sample) return;
+
+            const path = sample.path;
+            const method = item.method || "GET";
+            currentMethod = method;
+
+            document.getElementById("customUrlInput").value = path;
+
+            // Merge / pick headers: sample headers override item headers
+            let sampleHeaders = (sample.headers && Object.keys(sample.headers).length > 0)
+                ? { ...sample.headers }
+                : { ...(item.headers || {}) };
+
+            // If an operational key was fetched and this request doesn't have custom headers and is not /api/v1/keys,
+            // populate X-API-Key so the request works cleanly without triggering browser Basic Auth prompts
+            if (currentOperationalKey && !path.startsWith("/api/v1/keys") && Object.keys(sampleHeaders).length === 0) {
+                sampleHeaders = { "X-API-Key": currentOperationalKey };
+            }
+
+            const headersStr = formatHeadersForInput(sampleHeaders);
+            lastDefaultHeadersString = headersStr;
+
+            const headersInput = document.getElementById("customHeadersInput");
+            if (headersInput) {
+                headersInput.value = headersStr;
+            }
+            updateResetButtonVisibility();
+
+            executeUrl(path, method, sampleHeaders);
+        }
+
         async function tryEndpoint(path, method, buttonEl) {
             document.querySelectorAll(".sample-pill").forEach(el => el.classList.remove("active"));
             if (buttonEl) {
                 buttonEl.classList.add("active");
             }
             document.getElementById("customUrlInput").value = path;
-            await executeUrl(path, method || (path === "/api/cache/clear" ? "POST" : "GET"));
+            currentMethod = method || (path === "/api/cache/clear" ? "POST" : "GET");
+            const headers = parseHeaders(document.getElementById("customHeadersInput").value);
+            await executeUrl(path, currentMethod, headers);
+        }
+
+        function syncHeadersForCustomUrl(path) {
+            if (!path) return;
+            const headersInput = document.getElementById("customHeadersInput");
+            if (!headersInput) return;
+            
+            // Check if current headers contain X-Bootstrap-Key
+            const parsed = parseHeaders(headersInput.value);
+            const hasBootstrapHeader = Object.keys(parsed).some(k => k.toLowerCase() === "x-bootstrap-key");
+
+            // If the user changed the URL away from /api/v1/keys, do not keep X-Bootstrap-Key
+            if (hasBootstrapHeader && !path.startsWith("/api/v1/keys")) {
+                headersInput.value = "";
+                lastDefaultHeadersString = "";
+                updateResetButtonVisibility();
+            }
         }
 
         async function executeCurrentUrl() {
             const path = document.getElementById("customUrlInput").value.trim();
             if (path) {
-                const method = path === "/api/cache/clear" ? "POST" : "GET";
-                await executeUrl(path, method);
+                syncHeadersForCustomUrl(path);
+                const method = path === "/api/cache/clear" ? "POST" : (currentMethod || "GET");
+                const headers = parseHeaders(document.getElementById("customHeadersInput").value);
+                await executeUrl(path, method, headers);
             }
         }
 
-        async function executeUrl(path, method = "GET") {
+        async function executeUrl(path, method = "GET", headers = {}) {
             const executeBtn = document.getElementById("executeBtn");
             const codeView = document.getElementById("jsonCodeView");
             const viewerMeta = document.getElementById("viewerMeta");
@@ -853,7 +1040,12 @@
 
             const startTime = performance.now();
             try {
-                const res = await fetch(path, { method: method });
+                const fetchOptions = {
+                    method: method,
+                    headers: headers
+                };
+                let res = await fetch(path, fetchOptions);
+
                 const duration = Math.round(performance.now() - startTime);
                 const text = await res.text();
 
@@ -874,6 +1066,9 @@
 
                 try {
                     const parsed = JSON.parse(text);
+                    if (path.startsWith("/api/v1/keys") && parsed && parsed.operational_key) {
+                        currentOperationalKey = parsed.operational_key;
+                    }
                     const formatted = JSON.stringify(parsed, null, 2);
                     lastRawJsonResponse = formatted;
                     codeView.innerHTML = syntaxHighlightJson(formatted);
@@ -901,7 +1096,66 @@
             }
         }
 
-        // 4. Auto-refresh controls
+        // 4. Headers parsing & controls
+        function parseHeaders(text) {
+            const headers = {};
+            if (!text || !text.trim()) return headers;
+            const trimmed = text.trim();
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                try {
+                    return JSON.parse(trimmed);
+                } catch (e) {
+                    // fallback to line parser
+                }
+            }
+            const lines = trimmed.split("\n");
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (!trimmedLine || trimmedLine.startsWith("#") || trimmedLine.startsWith("//")) continue;
+                const colonIdx = trimmedLine.indexOf(":");
+                if (colonIdx > 0) {
+                    const name = trimmedLine.substring(0, colonIdx).trim();
+                    const value = trimmedLine.substring(colonIdx + 1).trim();
+                    if (name) {
+                        headers[name] = value;
+                    }
+                }
+            }
+            return headers;
+        }
+
+        function formatHeadersForInput(headersObj) {
+            if (!headersObj || Object.keys(headersObj).length === 0) return "";
+            return Object.entries(headersObj)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join("\n");
+        }
+
+        function clearHeadersInput() {
+            const input = document.getElementById("customHeadersInput");
+            if (input) input.value = "";
+            updateResetButtonVisibility();
+        }
+
+        function resetDefaultHeaders() {
+            const input = document.getElementById("customHeadersInput");
+            if (input) input.value = lastDefaultHeadersString;
+            updateResetButtonVisibility();
+        }
+
+        function updateResetButtonVisibility() {
+            const resetBtn = document.getElementById("resetHeadersBtn");
+            const input = document.getElementById("customHeadersInput");
+            if (!resetBtn || !input) return;
+            const currentVal = input.value.trim();
+            if (lastDefaultHeadersString && currentVal !== lastDefaultHeadersString.trim()) {
+                resetBtn.style.display = "inline";
+            } else {
+                resetBtn.style.display = "none";
+            }
+        }
+
+        // 5. Auto-refresh controls
         function toggleAutoRefresh() {
             const enabled = document.getElementById("autoRefreshCheckbox").checked;
             if (enabled) {
@@ -932,7 +1186,7 @@
             }
         }
 
-        // 5. Utility Helpers
+        // 6. Utility Helpers
         function copyResponseJson() {
             if (!lastRawJsonResponse) return;
             navigator.clipboard.writeText(lastRawJsonResponse).then(() => {
@@ -976,6 +1230,19 @@
         window.addEventListener("DOMContentLoaded", () => {
             loadCatalog();
             refreshMonitor();
+
+            const headersInput = document.getElementById("customHeadersInput");
+            if (headersInput) {
+                headersInput.addEventListener("input", updateResetButtonVisibility);
+            }
+            const urlInput = document.getElementById("customUrlInput");
+            if (urlInput) {
+                urlInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        executeCurrentUrl();
+                    }
+                });
+            }
         });
     </script>
 </body>

@@ -383,7 +383,11 @@ class ApplicationTest {
                 val body = response.bodyAsText()
                 assertTrue(body.contains(""""path":"/monitor""""))
                 assertTrue(body.contains(""""path":"/api/prices/{countryCode?}""""))
+                assertTrue(body.contains(""""path":"/api/v1/keys""""))
                 assertTrue(body.contains(""""category":"Monitoring & Diagnostics""""))
+                assertTrue(body.contains(""""category":"Authentication & Keys""""))
+                assertTrue(body.contains(""""headers":{"X-Bootstrap-Key":"test-bootstrap-key"}"""))
+                assertTrue(body.contains(""""X-Bootstrap-Key":"invalid-bootstrap-key""""))
                 assertTrue(body.contains(""""samples":[{"""))
             }
         )
