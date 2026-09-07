@@ -29,7 +29,8 @@ class KeyRotationService(
     /**
      * Derives the current key and returns TTL metadata for client consumption.
      */
-    fun getKeyInfo(now: Instant = clock.instant()): KeyRotationInfo {
+    fun getKeyInfo(): KeyRotationInfo {
+        val now = clock.instant()
         val epochSeconds = now.epochSecond
         val currentBucket = epochSeconds / BUCKET_DURATION_SECONDS
         val operationalKey = deriveKey(currentBucket)
@@ -52,9 +53,10 @@ class KeyRotationService(
      * Validates whether a provided key matches the current bucket, the previous bucket (14-day grace),
      * or the next bucket (clock drift / future skew). Uses constant-time comparison to prevent timing attacks.
      */
-    fun isValid(key: String?, now: Instant = clock.instant()): Boolean {
+    fun isValid(key: String?): Boolean {
         if (key.isNullOrBlank()) return false
 
+        val now = clock.instant()
         val currentBucket = now.epochSecond / BUCKET_DURATION_SECONDS
         val keyBytes = key.toByteArray(StandardCharsets.UTF_8)
 
