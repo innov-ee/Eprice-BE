@@ -62,6 +62,10 @@ jobs:
             # 1. Securely create the .env file on the server
             cat <<EOF > $APP_DIR/.env
             ENTSOE_API_KEY=${{ secrets.ENTSOE_API_KEY }}
+            BOOTSTRAP_KEY=${{ secrets.BOOTSTRAP_KEY }}
+            MASTER_SECRET=${{ secrets.MASTER_SECRET }}
+            ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
             EOF
             
             # 2. Log in to GHCR on the VPS

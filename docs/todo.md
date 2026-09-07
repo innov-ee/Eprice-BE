@@ -16,5 +16,5 @@
 - Logging sometimes happens twice per request: in UseCase and Routes
 
 # Pre live
-- Remove GET endpoint for clearing cache
-- Make API only accessible to the app.
+- [x] Remove GET endpoint for clearing cache
+- [x] Make API only accessible to the app.

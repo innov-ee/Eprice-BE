@@ -19,6 +19,7 @@ data class EndpointDoc(
 )
 
 object EndpointCategory {
+    const val AUTHENTICATION = "Authentication & Keys"
     const val MONITORING = "Monitoring & Diagnostics"
     const val ENERGY_PRICES = "Energy Prices"
     const val PRICE_STATISTICS = "Price Statistics"
@@ -27,6 +28,15 @@ object EndpointCategory {
 
 object EndpointCatalog {
     val endpoints: List<EndpointDoc> = listOf(
+        EndpointDoc(
+            category = EndpointCategory.AUTHENTICATION,
+            method = "GET",
+            path = "/api/v1/keys",
+            description = "Fetches dynamic operational API key using X-Bootstrap-Key header.",
+            samples = listOf(
+                EndpointSample(label = "Fetch Key", path = "/api/v1/keys")
+            )
+        ),
         EndpointDoc(
             category = EndpointCategory.MONITORING,
             method = "GET",
@@ -111,10 +121,12 @@ object EndpointCatalog {
         ),
         EndpointDoc(
             category = EndpointCategory.CACHE_ADMINISTRATION,
-            method = "GET",
+            method = "POST",
             path = "/api/cache/clear",
-            description = "Clears all in-memory and file-backed caches.",
-            samples = emptyList()
+            description = "Clears all in-memory and file-backed caches (Requires Admin Basic Auth).",
+            samples = listOf(
+                EndpointSample(label = "Clear Caches (POST)", path = "/api/cache/clear")
+            )
         )
     )
 }

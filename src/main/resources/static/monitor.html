@@ -717,8 +717,9 @@
                 `;
 
                 items.forEach(item => {
+                    const itemMethod = item.method || "GET";
                     const samplesHtml = (item.samples || []).map(sample => `
-                        <button class="sample-pill" onclick="tryEndpoint('${escapeHtml(sample.path)}', this)">
+                        <button class="sample-pill" onclick="tryEndpoint('${escapeHtml(sample.path)}', '${itemMethod}', this)">
                             <span>▶</span> ${escapeHtml(sample.label)}
                         </button>
                     `).join("");
@@ -726,7 +727,7 @@
                     html += `
                         <div class="endpoint-item">
                             <div class="endpoint-header">
-                                <span class="method-badge">${escapeHtml(item.method || "GET")}</span>
+                                <span class="method-badge">${escapeHtml(itemMethod)}</span>
                                 <span class="endpoint-path">${escapeHtml(item.path)}</span>
                             </div>
                             <div class="endpoint-desc">${escapeHtml(item.description || "")}</div>
@@ -821,23 +822,24 @@
         }
 
         // 3. In-Page Endpoint Execution & Inspection
-        async function tryEndpoint(path, buttonEl) {
+        async function tryEndpoint(path, method, buttonEl) {
             document.querySelectorAll(".sample-pill").forEach(el => el.classList.remove("active"));
             if (buttonEl) {
                 buttonEl.classList.add("active");
             }
             document.getElementById("customUrlInput").value = path;
-            await executeUrl(path);
+            await executeUrl(path, method || (path === "/api/cache/clear" ? "POST" : "GET"));
         }
 
         async function executeCurrentUrl() {
             const path = document.getElementById("customUrlInput").value.trim();
             if (path) {
-                await executeUrl(path);
+                const method = path === "/api/cache/clear" ? "POST" : "GET";
+                await executeUrl(path, method);
             }
         }
 
-        async function executeUrl(path) {
+        async function executeUrl(path, method = "GET") {
             const executeBtn = document.getElementById("executeBtn");
             const codeView = document.getElementById("jsonCodeView");
             const viewerMeta = document.getElementById("viewerMeta");
@@ -847,11 +849,11 @@
 
             executeBtn.innerHTML = `<span class="spinner"></span>`;
             executeBtn.disabled = true;
-            codeView.innerHTML = "Sending request to " + escapeHtml(path) + "...";
+            codeView.innerHTML = `Sending ${escapeHtml(method)} request to ${escapeHtml(path)}...`;
 
             const startTime = performance.now();
             try {
-                const res = await fetch(path);
+                const res = await fetch(path, { method: method });
                 const duration = Math.round(performance.now() - startTime);
                 const text = await res.text();
 

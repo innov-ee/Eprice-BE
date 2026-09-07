@@ -4,6 +4,7 @@ import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.di.appModule
+import ee.innov.eprice.security.KeyRotationService
 import ee.innov.eprice.test.NoOpDailyAveragePriceCache
 import ee.innov.eprice.test.NoOpDailyStatsCache
 import ee.innov.eprice.test.NoOpPriceCache
@@ -12,9 +13,12 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.api.createClientPlugin
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -107,7 +111,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -131,7 +135,7 @@ class ApplicationTest {
                 entsoeContent = mockEntsoeSuccessXml,
                 entsoeStatus = HttpStatusCode.OK
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -155,7 +159,7 @@ class ApplicationTest {
                 entsoeContent = mockEntsoeNoDataErrorXml,
                 entsoeStatus = HttpStatusCode.BadRequest
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -173,7 +177,7 @@ class ApplicationTest {
                 entsoeContent = mockEntsoeAuthErrorXml,
                 entsoeStatus = HttpStatusCode.Unauthorized
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices")
 
                 assertEquals(HttpStatusCode.BadGateway, response.status)
@@ -194,7 +198,7 @@ class ApplicationTest {
                 entsoeContent = """{"error": "Too Many Requests"}""",
                 entsoeStatus = HttpStatusCode.OK
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices")
 
                 assertEquals(HttpStatusCode.BadGateway, response.status)
@@ -214,7 +218,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices/EE/stats?range=yesterday")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -237,7 +241,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices/ee/stats?range=yesterday")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -256,7 +260,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices/EE/stats?range=today")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -276,7 +280,7 @@ class ApplicationTest {
                 entsoeContent = mockEntsoeNoDataErrorXml,
                 entsoeStatus = HttpStatusCode.OK
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices/EE/stats?range=tomorrow")
 
                 assertEquals(HttpStatusCode.NotFound, response.status)
@@ -295,7 +299,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices/EE/stats?days=-5")
 
                 assertEquals(HttpStatusCode.BadRequest, response.status)
@@ -312,7 +316,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices/EE/stats?range=nextmonth")
 
                 assertEquals(HttpStatusCode.BadRequest, response.status)
@@ -329,7 +333,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/prices/EE/stats/summary")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -351,7 +355,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/monitor.html")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -372,7 +376,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 val response = client.get("/api/meta/routes")
 
                 assertEquals(HttpStatusCode.OK, response.status)
@@ -394,7 +398,7 @@ class ApplicationTest {
                 entsoeContent = "<Error>Entsoe should not be called</Error>",
                 entsoeStatus = HttpStatusCode.InternalServerError
             ),
-            testBlock = {
+            testBlock = { client ->
                 // First make an API call to generate some incoming and outgoing metrics
                 client.get("/api/prices")
 
@@ -412,6 +416,187 @@ class ApplicationTest {
                 assertTrue(body.contains(""""cacheHitRatio":0.0"""))
             }
         )
+    }
+
+    // --- Security Integration Tests ---
+
+    @Test
+    fun `GET health should return 200 OK without any authentication`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/health")
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains(""""status":"UP""""))
+    }
+
+    @Test
+    fun `GET keys should return 401 Unauthorized when X-Bootstrap-Key is missing`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/api/v1/keys")
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        assertTrue(response.bodyAsText().contains("Missing required header: X-Bootstrap-Key"))
+    }
+
+    @Test
+    fun `GET keys should return 401 Unauthorized when X-Bootstrap-Key is invalid`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/api/v1/keys") {
+            header("X-Bootstrap-Key", "wrong-bootstrap-key")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        assertTrue(response.bodyAsText().contains("Invalid key in header: X-Bootstrap-Key"))
+    }
+
+    @Test
+    fun `GET keys should return 200 OK with operational key metadata when X-Bootstrap-Key is valid`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/api/v1/keys") {
+            header("X-Bootstrap-Key", "dev-bootstrap-key-replace-me")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains(""""operational_key":"""))
+        assertTrue(body.contains(""""ttl_seconds":"""))
+        assertTrue(body.contains(""""expires_at":"""))
+    }
+
+    @Test
+    fun `GET prices without credentials should return 401 Unauthorized`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/api/prices")
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+    }
+
+    @Test
+    fun `GET prices with invalid X-API-Key should return 401 Unauthorized`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/api/prices") {
+            header("X-API-Key", "invalid-key")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+    }
+
+    @Test
+    fun `GET prices with valid X-API-Key should return 200 OK`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val validKey = KeyRotationService.getKeyInfo().operationalKey
+                val response = client.get("/api/prices") {
+                    header("X-API-Key", validKey)
+                }
+                assertEquals(HttpStatusCode.OK, response.status)
+            }
+        )
+    }
+
+    @Test
+    fun `GET prices with valid Admin Basic Auth should return 200 OK`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = mockEleringSuccessJson,
+                eleringStatus = HttpStatusCode.OK,
+                entsoeContent = "<Error>Entsoe should not be called</Error>",
+                entsoeStatus = HttpStatusCode.InternalServerError
+            ),
+            testBlock = {
+                val adminAuth = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:dev-admin-password".toByteArray())
+                val response = client.get("/api/prices") {
+                    header("Authorization", adminAuth)
+                }
+                assertEquals(HttpStatusCode.OK, response.status)
+            }
+        )
+    }
+
+    @Test
+    fun `GET monitor should return 401 Unauthorized when unauthenticated`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/monitor")
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+    }
+
+    @Test
+    fun `GET monitor html should return 401 Unauthorized when unauthenticated`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/monitor.html")
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+    }
+
+    @Test
+    fun `GET cache clear should fail or not be routed as GET`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.get("/api/cache/clear")
+        // Since /api/cache/clear is now POST only, GET returns 404/405 or 401
+        assertTrue(response.status == HttpStatusCode.NotFound || response.status == HttpStatusCode.MethodNotAllowed)
+    }
+
+    @Test
+    fun `POST cache clear without credentials should return 401 Unauthorized`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val response = client.post("/api/cache/clear")
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+    }
+
+    @Test
+    fun `POST cache clear with X-API-Key only should return 401 Unauthorized (Admin Basic required)`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val validApiKey = KeyRotationService.getKeyInfo().operationalKey
+        val response = client.post("/api/cache/clear") {
+            header("X-API-Key", validApiKey)
+        }
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+    }
+
+    @Test
+    fun `POST cache clear with valid Admin Basic Auth should return 200 OK`() = testApplication {
+        application {
+            module(allowKoinOverrides = true)
+        }
+
+        val adminAuthHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:dev-admin-password".toByteArray())
+        val response = client.post("/api/cache/clear") {
+            header("Authorization", adminAuthHeader)
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("All caches clear initiated"))
     }
 
 
@@ -491,7 +676,7 @@ class ApplicationTest {
      */
     private fun runPriceApiTest(
         engineHandler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
-        testBlock: suspend ApplicationTestBuilder.() -> Unit
+        testBlock: suspend ApplicationTestBuilder.(HttpClient) -> Unit
     ) = testApplication {
         // ARRANGE:
         val mockEngine = MockEngine(engineHandler)
@@ -520,7 +705,18 @@ class ApplicationTest {
             )
         }
 
-        // ACT & ASSERT: Run the specific test logic
-        testBlock()
+        val validApiKey = KeyRotationService.getKeyInfo().operationalKey
+        val adminAuthHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:dev-admin-password".toByteArray())
+
+        // Create an authenticated client that sends X-API-Key and Admin Basic Auth by default
+        val authClient = createClient {
+            defaultRequest {
+                header("X-API-Key", validApiKey)
+                header("Authorization", adminAuthHeader)
+            }
+        }
+
+        // Run the specific test logic passing authClient
+        testBlock(authClient)
     }
 }

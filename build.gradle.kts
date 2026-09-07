@@ -24,10 +24,12 @@ repositories {
 }
 
 dependencies {
-    // Ktor Core
+    // Ktor
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-cors-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-forwarded-header-jvm:$ktor_version")
 
     // Ktor Client for making HTTP requests
     implementation("io.ktor:ktor-client-core-jvm:$ktor_version")
