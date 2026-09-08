@@ -24,10 +24,12 @@ repositories {
 }
 
 dependencies {
-    // Ktor Core
+    // Ktor
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-cors-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-forwarded-header-jvm:$ktor_version")
 
     // Ktor Client for making HTTP requests
     implementation("io.ktor:ktor-client-core-jvm:$ktor_version")
@@ -71,6 +73,11 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // env variables for unit tests to pass
+    environment("BOOTSTRAP_KEYS", "test-bootstrap-key")
+    environment("MASTER_SECRET", "test-master-secret-at-least-32-bytes-long")
+    environment("ADMIN_USERNAME", "admin")
+    environment("ADMIN_PASSWORD", "password")
     testLogging {
         events("passed", "skipped", "failed")
     }

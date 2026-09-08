@@ -2,6 +2,7 @@ package ee.innov.eprice
 
 import ee.innov.eprice.di.appModule
 import ee.innov.eprice.presentation.priceRoutes
+import ee.innov.eprice.security.configureSecurity
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -10,6 +11,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.routing.routing
 import org.koin.core.module.Module
 import org.koin.ktor.plugin.Koin
@@ -52,7 +54,13 @@ fun Application.module(
     install(CORS) {
         anyHost()
         allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Authorization)
+        allowHeader("X-Bootstrap-Key")
+        allowHeader("X-API-Key")
     }
+    install(XForwardedHeaders)
+
+    configureSecurity()
 
     routing {
         priceRoutes() // Use the modularized routes

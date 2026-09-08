@@ -1,9 +1,9 @@
 # TODO
 - Requests for tomorrows prices/stats can miss cache before noon, and this means they fall thru to actual requests every time - undesired, improve!
-- stats requests in ranges where data is missing always trigger outgoing requests - undesired, improve!
-- Consider removing Result wrappers
+- Stats requests in ranges where data is missing always trigger outgoing requests - undesired, improve!
 
 # Nice to have
+- Consider removing Result wrappers
 - Clean up routing a lot (that class should have minimal to no changes when any route is changed/added/removed)
 - Figure out the best way to handle time. (tiemstamp, bespoke class, zones, etc)
 - Figure out api contract, e.g sending double values or strings or smth else insstead?
@@ -14,7 +14,8 @@
 
 # Nits
 - Logging sometimes happens twice per request: in UseCase and Routes
+- Move admin panel also behind stricter rate limiting
 
 # Pre live
-- Remove GET endpoint for clearing cache
-- Make API only accessible to the app.
+- [x] Remove GET endpoint for clearing cache
+- [x] Make API only accessible to the app.

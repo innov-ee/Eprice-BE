@@ -49,23 +49,37 @@ jobs:
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          GITHUB_SHA: ${{ github.sha }}
+          GH_USER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+          BOOTSTRAP_KEYS: ${{ secrets.BOOTSTRAP_KEYS }}
+          MASTER_SECRET: ${{ secrets.MASTER_SECRET }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         with:
           host: ${{ secrets.VPS_SSH_HOST }}
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # Pass the GitHub Actions env variables safely into the remote SSH session
+          envs: IMAGE_NAME,GITHUB_SHA,GH_USER,GH_TOKEN,ENTSOE_API_KEY,BOOTSTRAP_KEYS,MASTER_SECRET,ADMIN_USERNAME,ADMIN_PASSWORD
           script: |
             APP_DIR="/home/deployer/Eprice-BE"
-            IMAGE_TO_DEPLOY="${{ env.IMAGE_NAME }}:${{ github.sha }}"
-            GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-            GH_USER="${{ github.repository_owner }}"
+            IMAGE_TO_DEPLOY="${IMAGE_NAME}:${GITHUB_SHA}"
             
-            # 1. Securely create the .env file on the server
+            # 1. Securely create the .env file on the server (quoted to handle spaces)
             cat <<EOF > $APP_DIR/.env
-            ENTSOE_API_KEY=${{ secrets.ENTSOE_API_KEY }}
+            ENTSOE_API_KEY="${ENTSOE_API_KEY}"
+            BOOTSTRAP_KEYS="${BOOTSTRAP_KEYS}"
+            MASTER_SECRET="${MASTER_SECRET}"
+            ADMIN_USERNAME="${ADMIN_USERNAME}"
+            ADMIN_PASSWORD="${ADMIN_PASSWORD}"
             EOF
             
             # 2. Log in to GHCR on the VPS
-            echo "$GH_TOKEN" | docker login ghcr.io -u $GH_USER --password-stdin
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             
             # 3. Run the deploy script
             bash /home/deployer/deploy.sh "$IMAGE_TO_DEPLOY"

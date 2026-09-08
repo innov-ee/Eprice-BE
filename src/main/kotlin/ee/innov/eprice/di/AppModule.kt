@@ -20,6 +20,8 @@ import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
+import ee.innov.eprice.security.KeyRotationService
+import ee.innov.eprice.util.getEnv
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpRequestRetry
@@ -47,6 +49,8 @@ private fun resolveCachePath(fileName: String): Path {
 val appModule = module {
 
     single { ServiceMonitor() }
+
+    single { KeyRotationService() }
 
     single {
         val clientLogger = LoggerFactory.getLogger("ee.innov.eprice.httpclient")
@@ -95,8 +99,7 @@ val appModule = module {
     }
 
     single(qualifier = named("entsoeApiKey")) {
-        System.getenv("ENTSOE_API_KEY")
-            ?: throw IllegalStateException("ENTSOE_API_KEY environment variable is not set.")
+        getEnv("ENTSOE_API_KEY")
     }
 
     single {
