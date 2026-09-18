@@ -22,7 +22,7 @@ class GetPriceSummaryUseCase(
 ) {
     companion object {
         // Can be switched from 5 to 30 as needed
-        const val DEFAULT_ROLLING_DAYS = 5
+        const val DEFAULT_ROLLING_DAYS = 30
     }
 
     suspend fun execute(countryCode: String): Result<PriceSummaryStatistics> {
