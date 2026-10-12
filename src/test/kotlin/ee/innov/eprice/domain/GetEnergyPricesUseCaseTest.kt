@@ -34,7 +34,7 @@ class GetEnergyPricesUseCaseTest {
         val spyRepo = EnergyPriceRepositorySpy()
         // Summer instant: 2026-08-22 10:00 UTC -> in Estonia (UTC+3) today is 2026-08-22
         // Yesterday: 2026-08-21 start -> 2026-08-20T21:00:00Z
-        // Tomorrow: 2026-08-23 end -> 2026-08-23T20:59:59Z
+        // Tomorrow: 2026-08-23 end -> 2026-08-23T21:00:00Z
         val fixedInstant = Instant.parse("2026-08-22T10:00:00Z")
         val clock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
         val useCase = GetEnergyPricesUseCase(spyRepo, clock)
@@ -43,6 +43,6 @@ class GetEnergyPricesUseCaseTest {
         assertTrue(result.isSuccess)
         assertEquals("EE", spyRepo.capturedCountryCode)
         assertEquals(Instant.parse("2026-08-20T21:00:00Z"), spyRepo.capturedStart)
-        assertEquals(Instant.parse("2026-08-23T20:59:59Z"), spyRepo.capturedEnd)
+        assertEquals(Instant.parse("2026-08-23T21:00:00Z"), spyRepo.capturedEnd)
     }
 }

@@ -46,9 +46,8 @@ class GetPriceStatisticsUseCase(
 
                 val minPrice = dailyStats.minOf { it.min }
                 val maxPrice = dailyStats.maxOf { it.max }
-                val totalSum = dailyStats.sumOf { it.sum }
-                val totalCount = dailyStats.sumOf { it.count }
-                val averagePrice = if (totalCount > 0) totalSum / totalCount else 0.0
+                val seconds = dailyStats.sumOf { it.durationSeconds }
+                val averagePrice = if (seconds > 0) dailyStats.sumOf { it.avg * it.durationSeconds } / seconds else 0.0
 
                 return PriceStatistics(
                     countryCode = countryCode,

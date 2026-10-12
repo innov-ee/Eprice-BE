@@ -4,6 +4,10 @@ import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.di.appModule
+import ee.innov.eprice.domain.GetEnergyPricesUseCase
+import ee.innov.eprice.domain.GetPriceStatisticsUseCase
+import ee.innov.eprice.domain.GetPriceSummaryUseCase
+import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.security.KeyRotationService
 import ee.innov.eprice.test.NoOpDailyAveragePriceCache
 import ee.innov.eprice.test.NoOpDailyStatsCache
@@ -686,6 +690,11 @@ class ApplicationTest {
         val mockEngine = MockEngine(engineHandler)
 
         val testModule = module {
+            val clock = java.time.Clock.fixed(java.time.Instant.parse("2023-01-02T12:00:00Z"), java.time.ZoneOffset.UTC)
+            factory { GetEnergyPricesUseCase(get(), clock) }
+            factory { GetPriceStatisticsUseCase(get(), clock) }
+            factory { GetPriceSummaryUseCase(get(), clock) }
+            factory { GetRollingAveragePriceUseCase(get(), get(), clock) }
             single {
                 val monitor = get<ee.innov.eprice.monitoring.ServiceMonitor>()
                 HttpClient(mockEngine) {

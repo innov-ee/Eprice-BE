@@ -11,12 +11,13 @@ data class DailyStatEntry(
     val max: Double,
     val avg: Double,
     val sum: Double,
-    val count: Int
+    val count: Int,
+    val durationSeconds: Long = count * 3600L
 ) {
     /**
      * Checks if this stat entry has enough data points to represent a full day in the given timezone.
      */
     fun isFullDay(date: LocalDate, zoneId: ZoneId): Boolean {
-        return count >= CountryZoneProvider.getExpectedHoursForDay(date, zoneId)
+        return durationSeconds == CountryZoneProvider.getExpectedHoursForDay(date, zoneId) * 3600L
     }
 }

@@ -96,7 +96,7 @@ class PriceStatsRepositoryImplTest {
         assertEquals(1, priceRepo.requestedRanges.size)
         val (summerStart, summerEnd) = priceRepo.requestedRanges[0]
         assertEquals(Instant.parse("2026-08-21T21:00:00Z"), summerStart)
-        assertEquals(Instant.parse("2026-08-22T20:59:59Z"), summerEnd)
+        assertEquals(Instant.parse("2026-08-22T21:00:00Z"), summerEnd)
 
         // Winter date in Estonia (EET is UTC+2): 2026-01-15 start is 2026-01-14T22:00:00Z
         val winterDate = LocalDate.of(2026, 1, 15)
@@ -105,7 +105,7 @@ class PriceStatsRepositoryImplTest {
         assertEquals(2, priceRepo.requestedRanges.size)
         val (winterStart, winterEnd) = priceRepo.requestedRanges[1]
         assertEquals(Instant.parse("2026-01-14T22:00:00Z"), winterStart)
-        assertEquals(Instant.parse("2026-01-15T21:59:59Z"), winterEnd)
+        assertEquals(Instant.parse("2026-01-15T22:00:00Z"), winterEnd)
     }
 
     @Test
