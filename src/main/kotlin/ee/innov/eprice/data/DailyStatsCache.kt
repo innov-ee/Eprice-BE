@@ -31,7 +31,7 @@ private data class DailyStatsCacheFile(
 )
 
 class FileBackedDailyStatsCache(
-    cacheFile: Path = Paths.get("daily-stats-cache.json")
+    cacheFile: Path = Paths.get("daily-stats-cache-v2.json")
 ) : BaseFileCache(cacheFile), DailyStatsCache {
 
     // In-memory thread-safe cache

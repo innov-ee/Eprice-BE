@@ -115,15 +115,15 @@ val appModule = module {
     }
 
     single<PriceCache> {
-        InMemoryPriceCache(cacheFile = resolveCachePath("eprice-cache.json"))
+        InMemoryPriceCache(cacheFile = resolveCachePath("eprice-cache-v2.json"))
     }
 
     single<DailyAveragePriceCache> {
-        FileBackedDailyAveragePriceCache(cacheFile = resolveCachePath("daily-average-cache.json"))
+        FileBackedDailyAveragePriceCache(cacheFile = resolveCachePath("daily-average-cache-v2.json"))
     }
 
     single<DailyStatsCache> {
-        FileBackedDailyStatsCache(cacheFile = resolveCachePath("daily-stats-cache.json"))
+        FileBackedDailyStatsCache(cacheFile = resolveCachePath("daily-stats-cache-v2.json"))
     }
 
     single<EnergyPriceRepository> {
