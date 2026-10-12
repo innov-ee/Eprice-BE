@@ -111,6 +111,10 @@ fun Route.priceRoutes() {
             call.respond(HttpStatusCode.OK, EndpointCatalog.endpoints)
         }
 
+        get("/api/meta/regions") {
+            call.respond(HttpStatusCode.OK, configuredRegions())
+        }
+
         get("/api/prices/{countryCode?}") {
             val countryCode = call.resolveRegionCode() ?: return@get
 

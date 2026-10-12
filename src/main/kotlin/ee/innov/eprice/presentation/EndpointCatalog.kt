@@ -118,8 +118,15 @@ object EndpointCatalog {
         EndpointDoc(
             category = EndpointCategory.ENERGY_PRICES,
             method = "GET",
+            path = "/api/meta/regions",
+            description = "Configured price areas, local timezones and providers. Price availability depends on the provider and date.",
+            samples = listOf(EndpointSample(label = "Configured Regions", path = "/api/meta/regions"))
+        ),
+        EndpointDoc(
+            category = EndpointCategory.ENERGY_PRICES,
+            method = "GET",
             path = "/api/prices/{countryCode?}",
-            description = "Hourly energy prices for today and tomorrow.",
+            description = "Available energy price intervals for yesterday, today and tomorrow in the area's local timezone.",
             samples = listOf(
                 EndpointSample(label = "Estonia (EE)", path = "/api/prices/EE"),
                 EndpointSample(label = "Latvia (LV)", path = "/api/prices/LV"),
@@ -162,7 +169,7 @@ object EndpointCatalog {
             path = "/api/prices/{countryCode}/stats",
             description = "Calculates energy price statistics for named ranges, day counts, or custom dates.",
             samples = listOf(
-                EndpointSample(label = "Default (Today)", path = "/api/prices/EE/stats"),
+                EndpointSample(label = "Default (Past 5 Days)", path = "/api/prices/EE/stats"),
                 EndpointSample(label = "Yesterday", path = "/api/prices/EE/stats?range=yesterday"),
                 EndpointSample(label = "Today", path = "/api/prices/EE/stats?range=today"),
                 EndpointSample(label = "Tomorrow", path = "/api/prices/EE/stats?range=tomorrow"),

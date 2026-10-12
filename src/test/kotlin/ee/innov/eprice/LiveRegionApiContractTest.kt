@@ -121,6 +121,25 @@ class LiveRegionApiContractTest {
     }
 
     @Test
+    fun `configured region catalogue lists canonical codes and live provider choices`() = withApi { client ->
+        val response = client.get("/api/meta/regions")
+        assertEquals(HttpStatusCode.OK, response.status)
+        val regions = Json.parseToJsonElement(response.bodyAsText()).jsonArray.map { it.jsonObject }
+        assertEquals(49, regions.size)
+        val byCode = regions.associateBy { it.getValue("code").jsonPrimitive.content }
+        assertEquals(regions.size, byCode.size)
+        amounts.keys.forEach { code ->
+            assertEquals(listOf("elering", "entsoe"), byCode.getValue(code).getValue("providers").jsonArray.map { it.jsonPrimitive.content })
+        }
+        assertEquals("Europe/Helsinki", byCode.getValue("FI").getValue("timezone").jsonPrimitive.content)
+        assertEquals("Europe/Tallinn", byCode.getValue("EE").getValue("timezone").jsonPrimitive.content)
+        assertEquals("Europe/Oslo", byCode.getValue("NO1").getValue("timezone").jsonPrimitive.content)
+        assertTrue("DE_LU" in byCode)
+        assertFalse("DE" in byCode)
+        assertFalse("NO" in byCode)
+    }
+
+    @Test
     fun `provider failures retain 502 responses through price and statistics routes`() = withApi(
         failure = ApiError.Server(503, "Provider unavailable", IllegalStateException("Provider unavailable"))
     ) { client ->
