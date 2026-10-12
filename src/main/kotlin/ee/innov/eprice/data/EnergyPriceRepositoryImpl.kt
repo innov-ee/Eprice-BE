@@ -6,6 +6,7 @@ import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.data.entsoe.toBiddingZone
 import ee.innov.eprice.data.entsoe.toDomainEnergyPrices
 import ee.innov.eprice.domain.CountryZoneProvider
+import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.DomainEnergyPrice
@@ -24,10 +25,6 @@ class EnergyPriceRepositoryImpl(
 ) : EnergyPriceRepository {
 
     private val logger = LoggerFactory.getLogger(EnergyPriceRepositoryImpl::class.java)
-
-    companion object {
-        private val ELERING_SUPPORTED_COUNTRIES = setOf("EE", "FI", "LV", "LT")
-    }
 
     override suspend fun getPrices(
         countryCode: String,
@@ -74,10 +71,12 @@ class EnergyPriceRepositoryImpl(
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
         // Strategy: Try Elering first if supported.
-        if (normalizedCode in ELERING_SUPPORTED_COUNTRIES) {
+        val region = runCatching { BiddingZones.resolve(normalizedCode) }
+            .getOrElse { return Result.failure(it) }
+        if (region.eleringKey != null) {
             try {
-                val eleringMarketDocument = eleringService.fetchPrices(normalizedCode, start, end)
-                val prices = eleringMarketDocument.toDomainEnergyPrices(normalizedCode)
+                val eleringMarketDocument = eleringService.fetchPrices(region.eleringKey, start, end)
+                val prices = eleringMarketDocument.toDomainEnergyPrices(region.eleringKey)
                 if (prices.isNotEmpty()) {
                     return Result.success(prices)
                 }

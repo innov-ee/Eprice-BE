@@ -117,6 +117,15 @@ class LiveRegionApiContractTest {
     }
 
     @Test
+    fun `unknown and ambiguous regions return 400 before contacting a provider`() = withApi { client ->
+        listOf("UNKNOWN", "NO", "SE", "IT", "10X1001A1001A82H").forEach { code ->
+            listOf("", "/avg", "/stats", "/stats/summary").forEach { suffix ->
+                assertEquals(HttpStatusCode.BadRequest, client.get("/api/prices/$code$suffix").status)
+            }
+        }
+    }
+
+    @Test
     fun `live statistics retain fields types and local dates on the DST day`() = withApi { client ->
         amounts.forEach { (code, amount) ->
             val response = client.get("/api/prices/${code.lowercase()}/stats?range=today")
