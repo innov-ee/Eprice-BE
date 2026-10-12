@@ -28,7 +28,7 @@ private data class DailyCacheFile(
 )
 
 class FileBackedDailyAveragePriceCache(
-    cacheFile: Path = Paths.get("daily-average-cache.json")
+    cacheFile: Path = Paths.get("daily-average-cache-v2.json")
 ) : BaseFileCache(cacheFile), DailyAveragePriceCache {
 
 

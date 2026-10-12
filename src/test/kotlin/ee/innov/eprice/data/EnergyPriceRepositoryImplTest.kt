@@ -75,7 +75,7 @@ class EnergyPriceRepositoryImplTest {
         val d3 = LocalDate.of(2026, 8, 24)
 
         val start = d1.atStartOfDay(zoneId).toInstant()
-        val end = d3.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = d3.plusDays(1).atStartOfDay(zoneId).toInstant()
 
         // Generate complete 24h data for each day (72 hours total)
         val allPoints = mutableListOf<Pair<Long, Double>>()
@@ -138,7 +138,7 @@ class EnergyPriceRepositoryImplTest {
         val d3 = LocalDate.of(2026, 8, 24)
 
         val start = d1.atStartOfDay(zoneId).toInstant()
-        val end = d3.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = d3.plusDays(1).atStartOfDay(zoneId).toInstant()
 
         // Day 1 & 2 complete, Day 3 only has 2 hours (incomplete tomorrow)
         val points = mutableListOf<Pair<Long, Double>>()
@@ -207,7 +207,7 @@ class EnergyPriceRepositoryImplTest {
         val zoneId = CountryZoneProvider.getZoneId("DE")
         val d1 = LocalDate.of(2026, 8, 22)
         val start = d1.atStartOfDay(zoneId).toInstant()
-        val end = d1.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = d1.plusDays(1).atStartOfDay(zoneId).toInstant()
 
         val entsoeXml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
@@ -265,7 +265,7 @@ class EnergyPriceRepositoryImplTest {
         val zoneId = CountryZoneProvider.getZoneId("DE")
         val d1 = LocalDate.of(2026, 8, 22)
         val start = d1.atStartOfDay(zoneId).toInstant()
-        val end = d1.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = d1.plusDays(1).atStartOfDay(zoneId).toInstant()
 
         val entsoeXml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
@@ -317,14 +317,14 @@ class EnergyPriceRepositoryImplTest {
         assertTrue(result2.isSuccess)
         assertEquals(1, networkCallCount)
 
-        // Third call with new country code "DE_LU" fetches from network
+        // Canonical aliases share the same cache entry.
         val result3 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result3.isSuccess)
-        assertEquals(2, networkCallCount)
+        assertEquals(1, networkCallCount)
 
         // Fourth call with "DE_LU" should hit cache
         val result4 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result4.isSuccess)
-        assertEquals(2, networkCallCount)
+        assertEquals(1, networkCallCount)
     }
 }

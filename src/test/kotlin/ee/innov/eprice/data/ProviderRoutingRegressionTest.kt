@@ -6,6 +6,7 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.model.ApiError
+import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.test.NoOpPriceCache
 import ee.innov.eprice.test.entsoePriceXml
 import io.ktor.client.HttpClient
@@ -35,6 +36,37 @@ class ProviderRoutingRegressionTest {
         } finally {
             client.close()
         }
+    }
+
+    @Test
+    fun `repository returns and caches only requested intervals across region aliases`() = runBlocking {
+        var calls = 0
+        val engine = MockEngine {
+            calls++
+            respond(
+                entsoePriceXml(points = (1..8).map { it to 100.0 }, start = "2026-08-21T23:30:00Z", end = "2026-08-22T01:30:00Z"),
+                HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/xml")
+            )
+        }
+        val entries = mutableMapOf<String, List<DomainEnergyPrice>>()
+        val cache = object : PriceCache {
+            override fun get(key: String) = entries[key]
+            override fun put(key: String, prices: List<DomainEnergyPrice>, isComplete: Boolean) { entries[key] = prices }
+            override fun clear() = entries.clear()
+        }
+        val client = HttpClient(engine)
+        try {
+            val mapper = XmlMapper().apply { registerKotlinModule(); configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false) }
+            val repo = EnergyPriceRepositoryImpl(EntsoeService(client, mapper, "test-token"), EleringService(client), cache)
+            val prices = repo.getPrices("DE", start, end, true).getOrThrow()
+            assertEquals(4, prices.size)
+            assertEquals(start, prices.first().startTime)
+            assertEquals(start.plusSeconds(2700), prices.last().startTime)
+            assertEquals(prices, repo.getPrices("DE_LU", start, end, true).getOrThrow())
+            assertEquals(prices, repo.getPrices("10Y1001A1001A82H", start, end, true).getOrThrow())
+            assertEquals(1, calls)
+            assertEquals(listOf(prices), entries.values.toList())
+        } finally { client.close() }
     }
 
     @Test
