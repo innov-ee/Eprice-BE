@@ -8,6 +8,9 @@ import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
+import ee.innov.eprice.domain.EnergyPriceRepository
+import ee.innov.eprice.domain.model.ApiError
+import ee.innov.eprice.test.FixedPriceRepository
 import ee.innov.eprice.security.KeyRotationService
 import ee.innov.eprice.test.NoOpDailyAveragePriceCache
 import ee.innov.eprice.test.NoOpDailyStatsCache
@@ -44,7 +47,7 @@ class LiveRegionApiContractTest {
     @AfterEach
     fun stopKoin() = GlobalContext.stopKoin()
 
-    private fun withApi(tomorrowPublished: Boolean = true, block: suspend (HttpClient) -> Unit) = testApplication {
+    private fun withApi(tomorrowPublished: Boolean = true, failure: ApiError? = null, block: suspend (HttpClient) -> Unit) = testApplication {
         val engine = MockEngine { request ->
             if (request.url.host == "web-api.tp.entsoe.eu") {
                 assertFalse(tomorrowPublished, "Fallback should only be used for unpublished prices")
@@ -71,6 +74,7 @@ class LiveRegionApiContractTest {
             single<PriceCache> { NoOpPriceCache() }
             single<DailyStatsCache> { NoOpDailyStatsCache() }
             single<DailyAveragePriceCache> { NoOpDailyAveragePriceCache() }
+            if (failure != null) single<EnergyPriceRepository> { FixedPriceRepository(Result.failure(failure)) }
             factory { GetEnergyPricesUseCase(get(), clock) }
             factory { GetPriceStatisticsUseCase(get(), clock) }
             factory { GetPriceSummaryUseCase(get(), clock) }
@@ -114,6 +118,26 @@ class LiveRegionApiContractTest {
         }
         assertFalse(fields.getValue("daysRequested").jsonPrimitive.isString)
         assertFalse(fields.getValue("daysCalculated").jsonPrimitive.isString)
+    }
+
+    @Test
+    fun `provider failures retain 502 responses through price and statistics routes`() = withApi(
+        failure = ApiError.Server(503, "Provider unavailable", IllegalStateException("Provider unavailable"))
+    ) { client ->
+        amounts.keys.forEach { code ->
+            listOf("", "/avg", "/stats?range=today", "/stats/summary").forEach { suffix ->
+                assertEquals(HttpStatusCode.BadGateway, client.get("/api/prices/$code$suffix").status)
+            }
+        }
+    }
+
+    @Test
+    fun `provider timeouts retain 504 responses through price and statistics routes`() = withApi(
+        failure = ApiError.Timeout("Timed out", IllegalStateException("Timed out"))
+    ) { client ->
+        listOf("", "/avg", "/stats?range=today", "/stats/summary").forEach { suffix ->
+            assertEquals(HttpStatusCode.GatewayTimeout, client.get("/api/prices/EE$suffix").status)
+        }
     }
 
     @Test
