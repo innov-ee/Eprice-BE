@@ -92,13 +92,13 @@ class CountryZoneProviderTest {
 
         // Complete 96-interval dataset (15-minute intervals)
         val fullDay15m = (0 until 96).map { interval ->
-            DomainEnergyPrice(dayStart.plusSeconds(interval * 900L), 0.10)
+            DomainEnergyPrice(dayStart.plusSeconds(interval * 900L), 0.10, durationSeconds = 900)
         }
         assertTrue(fullDay15m.isFullDay(date, tallinnZone))
 
         // Incomplete 15m dataset (e.g. 2 hours = 8 intervals)
         val partial15m = (0 until 8).map { interval ->
-            DomainEnergyPrice(dayStart.plusSeconds(interval * 900L), 0.10)
+            DomainEnergyPrice(dayStart.plusSeconds(interval * 900L), 0.10, durationSeconds = 900)
         }
         assertFalse(partial15m.isFullDay(date, tallinnZone))
     }

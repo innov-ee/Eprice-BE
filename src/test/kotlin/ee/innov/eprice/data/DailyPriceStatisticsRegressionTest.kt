@@ -10,7 +10,6 @@ import ee.innov.eprice.test.InMemoryDailyAveragePriceCache
 import ee.innov.eprice.test.InMemoryDailyStatsCache
 import ee.innov.eprice.test.dayPrices
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
@@ -27,7 +26,6 @@ class DailyPriceStatisticsRegressionTest {
     private val clock = Clock.fixed(Instant.parse("2026-08-23T12:00:00Z"), ZoneOffset.UTC)
 
     @Test
-    @Tag("known-bug")
     fun `equal duration days have equal weight across an hourly to quarter hourly transition`() {
         // Two ordinary 24-hour days: one hourly at 0.10, one quarter hourly at 0.30.
         // Sample weighting gives 0.26; the average over elapsed time is 0.20.
@@ -35,7 +33,7 @@ class DailyPriceStatisticsRegressionTest {
             "DE", date, date.plusDays(1), 2,
             listOf(
                 DailyStatEntry(0.1, 0.1, 0.1, 2.4, 24),
-                DailyStatEntry(0.3, 0.3, 0.3, 28.8, 96)
+                DailyStatEntry(0.3, 0.3, 0.3, 28.8, 96, durationSeconds = 86400)
             )
         )!!
         assertEquals(0.2, stats.averagePrice, 1e-12)
@@ -45,12 +43,11 @@ class DailyPriceStatisticsRegressionTest {
         val start = date.atStartOfDay(zone).toInstant()
         val next = date.plusDays(1).atStartOfDay(zone).toInstant()
         // Include values on both sides; midnight belongs to the next day.
-        return listOf(DomainEnergyPrice(start.minusSeconds(900), -10.0)) +
+        return listOf(DomainEnergyPrice(start.minusSeconds(900), -10.0, durationSeconds = 900)) +
             dayPrices(date, zone) + listOf(DomainEnergyPrice(next, 10.0))
     }
 
     @Test
-    @Tag("known-bug")
     fun `daily statistics and cache contain only the requested local day`() = runBlocking {
         val cache = InMemoryDailyStatsCache()
         val repo = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(oversizedResponse())), cache)
@@ -64,7 +61,6 @@ class DailyPriceStatisticsRegressionTest {
     }
 
     @Test
-    @Tag("known-bug")
     fun `rolling average and cache exclude prices outside the requested local day`() = runBlocking {
         val cache = InMemoryDailyAveragePriceCache()
         val useCase = GetRollingAveragePriceUseCase(FixedPriceRepository(Result.success(oversizedResponse())), cache, clock)
@@ -75,7 +71,6 @@ class DailyPriceStatisticsRegressionTest {
     }
 
     @Test
-    @Tag("known-bug")
     fun `daily statistics propagate provider failures and do not cache them`() = runBlocking {
         val failure = IllegalStateException("Provider unavailable")
         val cache = InMemoryDailyStatsCache()
@@ -87,7 +82,6 @@ class DailyPriceStatisticsRegressionTest {
     }
 
     @Test
-    @Tag("known-bug")
     fun `rolling average preserves provider failure rather than reporting no data`() = runBlocking {
         val failure = IllegalStateException("Provider unavailable")
         val cache = InMemoryDailyAveragePriceCache()
@@ -106,6 +100,40 @@ class DailyPriceStatisticsRegressionTest {
         assertTrue(GetRollingAveragePriceUseCase(prices, averageCache, clock).execute("DE", 1).exceptionOrNull() is NoDataFoundException)
         assertTrue(statsCache.store.isEmpty())
         assertTrue(averageCache.store.isEmpty())
+    }
+
+    @Test
+    fun `mixed interval durations within one day use elapsed time rather than sample counts`() = runBlocking {
+        val start = date.atStartOfDay(zone).toInstant()
+        val prices = (0 until 12).map { DomainEnergyPrice(start.plusSeconds(it * 3600L), 0.1, 3600) } +
+            (0 until 48).map { DomainEnergyPrice(start.plusSeconds(43200 + it * 900L), 0.3, 900) }
+        val repo = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(prices)), InMemoryDailyStatsCache())
+        val stats = repo.getDailyStats("DE", date, date).getOrThrow().getValue(date)
+        assertEquals(60, stats.count)
+        assertEquals(86400L, stats.durationSeconds)
+        assertEquals(0.2, stats.avg, 1e-12)
+    }
+
+    @Test
+    fun `rolling and statistics averages give a 25 hour day its actual elapsed weight`() = runBlocking {
+        val dstDate = LocalDate.of(2026, 10, 25)
+        val previous = dstDate.minusDays(1)
+        val prices = dayPrices(previous, zone, stepSeconds = 3600, price = 0.1) +
+            dayPrices(dstDate, zone, price = 0.3)
+        val priceRepo = FixedPriceRepository(Result.success(prices))
+        val daily = PriceStatsRepositoryImpl(priceRepo, InMemoryDailyStatsCache())
+            .getDailyStats("DE", previous, dstDate).getOrThrow()
+        val statistics = PriceStatistics.compute("DE", daily, previous, dstDate, 2)!!
+        val avgCache = InMemoryDailyAveragePriceCache()
+        val dstClock = Clock.fixed(Instant.parse("2026-10-26T12:00:00Z"), ZoneOffset.UTC)
+        val rolling = GetRollingAveragePriceUseCase(priceRepo, avgCache, dstClock).execute("DE", 2).getOrThrow()
+        val expected = (24 * 0.1 + 25 * 0.3) / 49
+        assertEquals(expected, statistics.averagePrice, 1e-12)
+        assertEquals(expected, rolling.averagePrice, 1e-12)
+        val cached = GetRollingAveragePriceUseCase(
+            FixedPriceRepository(Result.failure(IllegalStateException("Should not fetch cached days"))), avgCache, dstClock
+        ).execute("DE", 2).getOrThrow()
+        assertEquals(expected, cached.averagePrice, 1e-12)
     }
 
     @Test

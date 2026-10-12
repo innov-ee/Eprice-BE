@@ -1,6 +1,9 @@
 package ee.innov.eprice.domain
 
 import ee.innov.eprice.domain.model.isFullDay
+import ee.innov.eprice.domain.model.inRange
+import ee.innov.eprice.domain.model.isCompleteRange
+import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.test.dayPrices
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -10,6 +13,22 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PriceCoverageRegressionTest {
+    @Test
+    fun `exclusive midnight ends do not require the following day`() {
+        val zone = ZoneId.of("Europe/Tallinn")
+        val date = LocalDate.of(2026, 10, 25)
+        val prices = dayPrices(date, zone)
+        assertTrue(prices.isCompleteRange(zone, date.atStartOfDay(zone).toInstant(), date.plusDays(1).atStartOfDay(zone).toInstant()))
+    }
+
+    @Test
+    fun `intervals crossing a range boundary are clipped to their actual overlap`() {
+        val start = java.time.Instant.parse("2026-08-22T00:00:00Z")
+        val price = DomainEnergyPrice(start.minusSeconds(900), 0.1, 3600)
+        assertEquals(listOf(DomainEnergyPrice(start, 0.1, 1800)), listOf(price).inRange(start, start.plusSeconds(1800)))
+        assertTrue(listOf(price).inRange(start.plusSeconds(3600), start.plusSeconds(7200)).isEmpty())
+    }
+
     @Test
     fun `15 and 30 minute coverage accepts short and long DST days in multiple regions`() {
         listOf("Europe/Tallinn", "Europe/Berlin", "Europe/London").forEach { name ->

@@ -3,10 +3,9 @@ package ee.innov.eprice.domain
 import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.isFullDay
+import ee.innov.eprice.domain.model.inRange
+import kotlinx.coroutines.CancellationException
 import ee.innov.eprice.monitoring.ServiceMonitor
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import java.time.Clock
 import java.time.LocalDate
@@ -22,7 +21,7 @@ class GetRollingAveragePriceUseCase(
      * Calculates the rolling average price for a given country over a number of days.
      *
      * It first checks a persistent daily average cache. If data for a day is missing,
-     * it fetches the hourly data from the repository, calculates the day's average,
+     * it fetches the interval data from the repository, calculates the day's average,
      * and stores it in the cache for future use.
      *
      * @param countryCode The 2-letter country code (e.g., "EE").
@@ -52,64 +51,32 @@ class GetRollingAveragePriceUseCase(
         monitor?.recordCacheHit(cachedAverages.size.toLong())
         monitor?.recordCacheMiss(missingDates.size.toLong())
 
-        val fetchedAverages = mutableMapOf<LocalDate, Double>()
-
-        if (missingDates.isNotEmpty()) {
-            // 4. Fetch missing dates in parallel
-            try {
-                coroutineScope {
-                    val deferredResults = missingDates.map { date ->
-                        async {
-                            // Fetch data for a single day
-                            val dayStart = date.atStartOfDay(zoneId).toInstant()
-                            val dayEnd =
-                                date.plusDays(1).atStartOfDay(zoneId).minusSeconds(1)
-                                    .toInstant()
-
-
-                            val result = energyPriceRepository.getPrices(
-                                countryCode = countryCode,
-                                start = dayStart,
-                                end = dayEnd,
-                                // dont cache, as its just noise
-                                cacheResults = false
-                            )
-
-
-                            result.getOrNull()?.let { prices ->
-                                if (prices.isFullDay(date, zoneId)) {
-                                    val dailyAvg = prices.map { it.pricePerKWh }.average()
-                                    // Store in our persistent daily cache
-                                    dailyAveragePriceCache.put(countryCode, date, dailyAvg)
-                                    date to dailyAvg // Return pair for map
-                                } else {
-                                    null // Incomplete or no data found for this day
-                                }
-                            }
-                            // If result.getOrNull() is null (a failure), this will also return null
-                            // We will filter these out later.
-                        }
-                    }
-                    // awaitAll() will propagate exceptions from children
-                    fetchedAverages.putAll(deferredResults.awaitAll().filterNotNull())
+        val allAverages = cachedAverages.toMutableMap()
+        try {
+            for (date in missingDates) {
+                val start = date.atStartOfDay(zoneId).toInstant()
+                val end = date.plusDays(1).atStartOfDay(zoneId).toInstant()
+                val prices = energyPriceRepository.getPrices(countryCode, start, end, cacheResults = false)
+                    .getOrThrow().inRange(start, end)
+                if (prices.isFullDay(date, zoneId)) {
+                    val average = prices.sumOf { it.pricePerKWh * it.durationSeconds } / prices.sumOf { it.durationSeconds }
+                    dailyAveragePriceCache.put(countryCode, date, average)
+                    allAverages[date] = average
                 }
-            } catch (e: Exception) {
-                // If any network request fails, propagate the error
-                return Result.failure(e)
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return Result.failure(e)
         }
-
-        // 5. Combine all results
-        val allAverages = (cachedAverages.values + fetchedAverages.values)
 
         if (allAverages.isEmpty()) {
-            return Result.failure(
-                NoDataFoundException("No price data found for $countryCode between $startDate and $endDate.")
-            )
+            return Result.failure(NoDataFoundException("No price data found for $countryCode between $startDate and $endDate."))
         }
-
-        // 6. Calculate the final average
-        val finalAverage = allAverages.average()
+        // Weight by elapsed time: a DST day contains 23 or 25 hours, regardless of resolution.
+        fun seconds(date: LocalDate) = CountryZoneProvider.getExpectedHoursForDay(date, zoneId) * 3600L
+        val finalAverage = allAverages.entries.sumOf { (date, avg) -> avg * seconds(date) } /
+            allAverages.keys.sumOf { seconds(it) }
         val daysCalculated = allAverages.size
 
         return Result.success(

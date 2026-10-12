@@ -1,6 +1,7 @@
 package ee.innov.eprice.domain
 
 import ee.innov.eprice.domain.model.DomainEnergyPrice
+import ee.innov.eprice.domain.model.inRange
 import java.time.Clock
 import java.time.LocalDate
 
@@ -23,8 +24,8 @@ class GetEnergyPricesUseCase(
         val start = today.minusDays(1).atStartOfDay(zoneId).toInstant()
 
         // Business logic: Set periodEnd to the end of tomorrow in the country's local timezone
-        val end = today.plusDays(2).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = today.plusDays(2).atStartOfDay(zoneId).toInstant()
 
-        return energyPriceRepository.getPrices(countryCode, start, end)
+        return energyPriceRepository.getPrices(countryCode, start, end).map { it.inRange(start, end) }
     }
 }
