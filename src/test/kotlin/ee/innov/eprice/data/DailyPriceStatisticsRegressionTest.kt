@@ -3,6 +3,7 @@ package ee.innov.eprice.data
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.GetPriceStatisticsUseCase.PriceStatistics
 import ee.innov.eprice.domain.model.DailyStatEntry
+import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.test.FixedPriceRepository
@@ -68,6 +69,18 @@ class DailyPriceStatisticsRegressionTest {
         assertEquals(0.1, average.averagePrice, 1e-12)
         assertEquals(1, average.daysCalculated)
         assertEquals(0.1, cache.get("DE", date)!!, 1e-12)
+    }
+
+    @Test
+    fun `typed provider errors remain failed Results in both statistics paths`() = runBlocking {
+        val cause = IllegalStateException("Provider unavailable")
+        listOf(ApiError.Server(503, "Provider unavailable", cause), ApiError.Timeout("Timed out", cause)).forEach { error ->
+            val prices = FixedPriceRepository(Result.failure(error))
+            val stats = PriceStatsRepositoryImpl(prices, InMemoryDailyStatsCache()).getDailyStats("DE", date, date)
+            val average = GetRollingAveragePriceUseCase(prices, InMemoryDailyAveragePriceCache(), clock).execute("DE", 1)
+            assertSame(error, stats.exceptionOrNull())
+            assertSame(error, average.exceptionOrNull())
+        }
     }
 
     @Test

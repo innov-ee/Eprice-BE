@@ -11,7 +11,7 @@ sealed class ApiError(
     override val message: String,
     open val details: String? = null,
     override val cause: Throwable? = null
-) : Throwable(message, cause) {
+) : Exception(message, cause) {
 
     data class Network(
         override val details: String,
