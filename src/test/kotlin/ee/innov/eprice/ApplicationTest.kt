@@ -68,7 +68,7 @@ class ApplicationTest {
 
     private val mockEntsoeSuccessXml = """
         <Publication_MarketDocument>
-            <TimeSeries>
+            <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
                 <Period>
                     <timeInterval>
                         <start>2023-01-01T00:00:00Z</start>

@@ -12,7 +12,7 @@ fun dayPrices(date: LocalDate, zone: ZoneId, stepSeconds: Long = 900, price: Dou
     val start = date.atStartOfDay(zone).toInstant()
     val end = date.plusDays(1).atStartOfDay(zone).toInstant()
     return (0 until Duration.between(start, end).seconds / stepSeconds).map {
-        DomainEnergyPrice(start.plusSeconds(it * stepSeconds), price)
+        DomainEnergyPrice(start.plusSeconds(it * stepSeconds), price, stepSeconds)
     }
 }
 
