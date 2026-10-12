@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import ee.innov.eprice.test.entsoePriceXml
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -27,6 +26,7 @@ class PriceParsingRegressionTest {
             prices.forEachIndexed { index, price ->
                 assertEquals(Instant.parse("2026-08-22T00:00:00Z").plusSeconds(index * step), price.startTime)
                 assertEquals(-0.05, price.pricePerKWh, 1e-12)
+                assertEquals(step, price.durationSeconds)
             }
         }
     }
@@ -46,7 +46,6 @@ class PriceParsingRegressionTest {
     }
 
     @Test
-    @Tag("known-bug")
     fun `A01 missing positions remain missing rather than carrying forward a price`() {
         val prices = parse(entsoePriceXml(points = listOf(1 to 100.0, 3 to 200.0)))
         assertEquals(
@@ -57,8 +56,32 @@ class PriceParsingRegressionTest {
     }
 
     @Test
-    @Tag("known-bug")
     fun `unknown resolution is rejected instead of silently treated as hourly`() {
         assertTrue(runCatching { parse(entsoePriceXml(resolution = "invalid")) }.isFailure)
+    }
+
+    @Test
+    fun `non EUR currency and unexpected units are rejected instead of mislabeled`() {
+        listOf(
+            entsoePriceXml().replace("<currency_Unit.name>EUR", "<currency_Unit.name>GBP"),
+            entsoePriceXml().replace("<price_Measure_Unit.name>MWH", "<price_Measure_Unit.name>KWH"),
+            entsoePriceXml().replace("<currency_Unit.name>EUR</currency_Unit.name>", "")
+        ).forEach { xml -> assertTrue(runCatching { parse(xml) }.isFailure) }
+    }
+
+    @Test
+    fun `A03 explicitly missing amounts stop price carry forward`() {
+        val xml = entsoePriceXml(curve = "A03", points = listOf(1 to 100.0, 2 to 0.0, 4 to 200.0))
+            .replace("<price.amount>0.0</price.amount>", "")
+        val prices = parse(xml)
+        assertEquals(listOf(0.1, 0.2), prices.map { it.pricePerKWh })
+        assertEquals(listOf(Instant.parse("2026-08-22T00:00:00Z"), Instant.parse("2026-08-22T00:45:00Z")), prices.map { it.startTime })
+    }
+
+    @Test
+    fun `invalid positions and conflicting duplicate prices are rejected`() {
+        listOf(listOf(0 to 100.0), listOf(5 to 100.0), listOf(1 to 100.0, 1 to 200.0)).forEach { points ->
+            assertTrue(runCatching { parse(entsoePriceXml(points = points)) }.isFailure)
+        }
     }
 }

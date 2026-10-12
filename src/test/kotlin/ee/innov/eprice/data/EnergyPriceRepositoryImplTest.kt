@@ -211,7 +211,7 @@ class EnergyPriceRepositoryImplTest {
 
         val entsoeXml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
                     <Period>
                         <timeInterval>
                             <start>2026-08-21T22:00Z</start>
@@ -269,7 +269,7 @@ class EnergyPriceRepositoryImplTest {
 
         val entsoeXml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
                     <Period>
                         <timeInterval>
                             <start>2026-08-21T22:00Z</start>

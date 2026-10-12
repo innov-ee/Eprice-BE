@@ -13,7 +13,8 @@ import java.time.temporal.ChronoUnit
 data class DomainEnergyPrice(
     @Serializable(with = InstantSerializer::class)
     val startTime: Instant,
-    val pricePerKWh: Double
+    val pricePerKWh: Double,
+    val durationSeconds: Long = 3600
 )
 
 /**

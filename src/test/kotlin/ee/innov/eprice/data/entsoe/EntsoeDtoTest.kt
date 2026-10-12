@@ -18,7 +18,7 @@ class EntsoeDtoTest {
     fun `toDomainEnergyPrices fills gaps in stepped A03 curve points`() {
         val xml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
                     <curveType>A03</curveType>
                     <Period>
                         <timeInterval>
@@ -103,7 +103,7 @@ class EntsoeDtoTest {
     fun `toDomainEnergyPrices parses multiple time series correctly`() {
         val xml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name><curveType>A03</curveType>
                     <Period>
                         <timeInterval>
                             <start>2026-08-20T22:00Z</start>
@@ -116,7 +116,7 @@ class EntsoeDtoTest {
                         </Point>
                     </Period>
                 </TimeSeries>
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name><curveType>A03</curveType>
                     <Period>
                         <timeInterval>
                             <start>2026-08-21T22:00Z</start>
@@ -145,8 +145,8 @@ class EntsoeDtoTest {
     fun `toDomainEnergyPrices deduplicates overlapping time series for same interval`() {
         val xml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
-                    <mRID>1</mRID>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
+                    <curveType>A03</curveType><mRID>1</mRID>
                     <Period>
                         <timeInterval>
                             <start>2026-08-20T22:00Z</start>
@@ -159,8 +159,8 @@ class EntsoeDtoTest {
                         </Point>
                     </Period>
                 </TimeSeries>
-                <TimeSeries>
-                    <mRID>2</mRID>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
+                    <curveType>A03</curveType><mRID>2</mRID>
                     <Period>
                         <timeInterval>
                             <start>2026-08-20T22:00Z</start>

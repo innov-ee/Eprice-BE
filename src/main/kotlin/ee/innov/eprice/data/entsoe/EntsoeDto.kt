@@ -5,7 +5,8 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import java.time.Instant
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
+import java.time.Duration
+import ee.innov.eprice.domain.model.InvalidPriceDataException
 
 // --- Data Models for XML Parsing ---
 
@@ -18,6 +19,10 @@ data class PublicationMarketDocument(
 data class TimeSeries(
     val mRID: String? = null,
     val curveType: String? = null,
+    @JsonProperty("currency_Unit.name")
+    val currency: String? = null,
+    @JsonProperty("price_Measure_Unit.name")
+    val priceUnit: String? = null,
     @JsonProperty("Period")
     @JacksonXmlElementWrapper(useWrapping = false)
     val period: List<Period> = emptyList()
@@ -38,74 +43,61 @@ data class TimeInterval(
 data class Point(
     val position: Int,
     @JsonProperty("price.amount")
-    val priceAmount: Double
+    val priceAmount: Double?
 )
 
-private fun parseResolutionMinutes(resolution: String): Long {
-    val trimmed = resolution.trim().uppercase()
-    return when {
-        trimmed == "PT1H" || trimmed == "PT60M" -> 60L
-        trimmed.startsWith("PT") && trimmed.endsWith("M") ->
-            trimmed.removePrefix("PT").removeSuffix("M").toLongOrNull() ?: 60L
-        trimmed.startsWith("PT") && trimmed.endsWith("H") ->
-            (trimmed.removePrefix("PT").removeSuffix("H").toLongOrNull() ?: 1L) * 60L
-        else -> 60L
+private fun checkPriceData(valid: Boolean, message: String) {
+    if (!valid) throw InvalidPriceDataException(message)
+}
+
+private fun parseResolutionSeconds(resolution: String): Long {
+    val duration = try { Duration.parse(resolution.trim().uppercase()) } catch (_: Exception) {
+        throw InvalidPriceDataException("Invalid price resolution: $resolution")
     }
+    checkPriceData(duration.seconds > 0 && duration.nano == 0 && duration.seconds % 60 == 0L,
+        "Price resolution must be a positive whole number of minutes: $resolution")
+    return duration.seconds
 }
 
 fun PublicationMarketDocument.toDomainEnergyPrices(): List<DomainEnergyPrice> {
-    return this.timeSeries.flatMap { timeSeries ->
-        timeSeries.period.flatMap { period ->
-            val resolutionMinutes = parseResolutionMinutes(period.resolution)
-            val periodStartInstant = Instant.from(
-                DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.start)
-            )
-
-            val sortedPoints = period.point.sortedBy { it.position }
-            if (sortedPoints.isEmpty()) {
-                emptyList()
-            } else {
-                val totalPositions = if (!period.timeInterval.end.isNullOrBlank()) {
-                    try {
-                        val periodEndInstant = Instant.from(
-                            DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.end)
-                        )
-                        val durationMinutes = java.time.Duration.between(periodStartInstant, periodEndInstant).toMinutes()
-                        (durationMinutes / resolutionMinutes).toInt()
-                    } catch (_: Exception) {
-                        sortedPoints.last().position
-                    }
-                } else {
-                    sortedPoints.last().position
+    val prices = timeSeries.flatMap { series ->
+        checkPriceData(series.currency == "EUR", "Expected EUR prices, received ${series.currency ?: "no currency"}")
+        checkPriceData(series.priceUnit == "MWH", "Expected MWH price unit, received ${series.priceUnit ?: "no unit"}")
+        val curve = series.curveType ?: "A01"
+        checkPriceData(curve == "A01" || curve == "A03", "Unsupported price curve: $curve")
+        series.period.flatMap periodLoop@ { period ->
+            val step = parseResolutionSeconds(period.resolution)
+            val start = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.start))
+            val points = period.point.sortedBy { it.position }
+            if (points.isEmpty()) return@periodLoop emptyList<DomainEnergyPrice>()
+            val end = period.timeInterval.end?.let { Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(it)) }
+                ?: start.plusSeconds(points.last().position * step)
+            val seconds = Duration.between(start, end).seconds
+            checkPriceData(seconds > 0 && seconds % step == 0L, "Price period does not match its resolution")
+            val count = seconds / step
+            checkPriceData(points.all { it.position in 1..count }, "Price point lies outside its period")
+            checkPriceData(points.all { it.priceAmount == null || it.priceAmount.isFinite() }, "Price must be finite")
+            val pointMap = points.groupBy { it.position }.mapValues { (_, duplicates) ->
+                checkPriceData(duplicates.map { it.priceAmount }.distinct().size == 1, "Conflicting prices for the same position")
+                duplicates.first()
+            }
+            if (curve == "A01") {
+                pointMap.values.mapNotNull { point ->
+                    point.priceAmount?.let { DomainEnergyPrice(start.plusSeconds((point.position - 1) * step), it / 1000, step) }
                 }
-
-                val endPosition = maxOf(totalPositions, sortedPoints.last().position)
-                val pointMap = sortedPoints.associateBy { it.position }
-
-                var currentPriceAmount = sortedPoints.first().priceAmount
-                (1..endPosition).mapNotNull { pos ->
-                    pointMap[pos]?.let { point ->
-                        currentPriceAmount = point.priceAmount
-                    }
-
-                    if (pos < sortedPoints.first().position) {
-                        null
-                    } else {
-                        val pricePerKWh = currentPriceAmount / 1000.0
-                        val intervalStart = periodStartInstant.plus(
-                            (pos - 1) * resolutionMinutes,
-                            ChronoUnit.MINUTES
-                        )
-
-                        DomainEnergyPrice(
-                            startTime = intervalStart,
-                            pricePerKWh = pricePerKWh
-                        )
-                    }
+            } else {
+                var amount: Double? = null
+                (1..count).mapNotNull { position ->
+                    pointMap[position.toInt()]?.let { amount = it.priceAmount }
+                    amount?.let { DomainEnergyPrice(start.plusSeconds((position - 1) * step), it / 1000, step) }
                 }
             }
         }
-    }.distinctBy { it.startTime }.sortedBy { it.startTime }
+    }
+    return prices.groupBy { it.startTime }.map { (_, duplicates) ->
+        checkPriceData(duplicates.distinct().size == 1, "Conflicting price series for the same UTC interval")
+        duplicates.first()
+    }.sortedBy { it.startTime }
 }
 
 /** Resolves known area identifiers through the shared timezone/EIC registry. */
