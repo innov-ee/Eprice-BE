@@ -77,12 +77,12 @@ class EnergyPriceRepositoryImplTest {
         val start = d1.atStartOfDay(zoneId).toInstant()
         val end = d3.plusDays(1).atStartOfDay(zoneId).toInstant()
 
-        // Generate complete 24h data for each day (72 hours total)
+        // Generate complete quarter-hourly data for each day (288 intervals total)
         val allPoints = mutableListOf<Pair<Long, Double>>()
         listOf(d1, d2, d3).forEach { d ->
             val dayStart = d.atStartOfDay(zoneId).toInstant()
-            (0 until 24).forEach { h ->
-                val epochSec = dayStart.plusSeconds(h * 3600L).epochSecond
+            (0 until 96).forEach { h ->
+                val epochSec = dayStart.plusSeconds(h * 900L).epochSecond
                 allPoints.add(epochSec to 100.0)
             }
         }
@@ -117,7 +117,7 @@ class EnergyPriceRepositoryImplTest {
         // First call - cold cache, fetches from network
         val firstResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(firstResult.isSuccess)
-        assertEquals(72, firstResult.getOrThrow().size)
+        assertEquals(288, firstResult.getOrThrow().size)
         assertEquals(1, networkCallCount.get())
         assertEquals(1, recordingCache.putInvocations.size)
         assertTrue(recordingCache.putInvocations[0].isComplete, "Complete 3-day data should be marked isComplete=true")
@@ -125,7 +125,7 @@ class EnergyPriceRepositoryImplTest {
         // Second call - warm cache, served from cache with zero network calls
         val secondResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(secondResult.isSuccess)
-        assertEquals(72, secondResult.getOrThrow().size)
+        assertEquals(288, secondResult.getOrThrow().size)
         assertEquals(1, networkCallCount.get(), "Network should not be called again on cache hit")
     }
 
@@ -144,13 +144,13 @@ class EnergyPriceRepositoryImplTest {
         val points = mutableListOf<Pair<Long, Double>>()
         listOf(d1, d2).forEach { d ->
             val dayStart = d.atStartOfDay(zoneId).toInstant()
-            (0 until 24).forEach { h ->
-                points.add(dayStart.plusSeconds(h * 3600L).epochSecond to 100.0)
+            (0 until 96).forEach { h ->
+                points.add(dayStart.plusSeconds(h * 900L).epochSecond to 100.0)
             }
         }
         val day3Start = d3.atStartOfDay(zoneId).toInstant()
-        (0 until 2).forEach { h ->
-            points.add(day3Start.plusSeconds(h * 3600L).epochSecond to 100.0)
+        (0 until 8).forEach { h ->
+            points.add(day3Start.plusSeconds(h * 900L).epochSecond to 100.0)
         }
 
         val eleringJson = createEleringResponseJson(points)
@@ -181,7 +181,7 @@ class EnergyPriceRepositoryImplTest {
         // First call - cold cache
         val firstResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(firstResult.isSuccess)
-        assertEquals(50, firstResult.getOrThrow().size)
+        assertEquals(200, firstResult.getOrThrow().size)
         assertEquals(1, networkCallCount.get())
         assertEquals(1, recordingCache.putInvocations.size)
         assertFalse(recordingCache.putInvocations[0].isComplete, "Incomplete data should be marked isComplete=false")
@@ -189,7 +189,7 @@ class EnergyPriceRepositoryImplTest {
         // Second call immediately - should hit cache within TTL window (throttled, no upstream spam)
         val secondResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(secondResult.isSuccess)
-        assertEquals(50, secondResult.getOrThrow().size)
+        assertEquals(200, secondResult.getOrThrow().size)
         assertEquals(1, networkCallCount.get(), "Should hit cache and not spam upstream while within TTL")
 
         // Wait for TTL to expire
