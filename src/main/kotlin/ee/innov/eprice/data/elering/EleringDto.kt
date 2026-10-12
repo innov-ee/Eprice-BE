@@ -1,11 +1,11 @@
 package ee.innov.eprice.data.elering
 
 import ee.innov.eprice.domain.model.DomainEnergyPrice
-import ee.innov.eprice.domain.CountryZoneProvider
 import ee.innov.eprice.domain.model.InvalidPriceDataException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.util.Locale
 
 @Serializable
 data class EleringPriceResponse(
@@ -15,7 +15,7 @@ data class EleringPriceResponse(
 ) {
     // map keys always to be uppercase
     val data: Map<String, List<EleringPriceData>> by lazy {
-        _data.mapKeys { it.key.uppercase() }
+        _data.mapKeys { it.key.uppercase(Locale.ROOT) }
     }
 }
 
@@ -39,22 +39,19 @@ fun EleringPriceResponse.toDomainEnergyPrices(countryCode: String): List<DomainE
     if (prices.any { !it.price.isFinite() } || prices.map { it.timestamp }.distinct().size != prices.size) {
         throw InvalidPriceDataException("Elering returned non-finite prices or duplicate timestamps")
     }
-    val zone = CountryZoneProvider.getZoneId(countryCode)
-    // Elering provides starts only. Infer the regular step within each local day,
-    // preserving historical hourly days when a range spans a resolution change.
-    val fallbackStep = prices.zipWithNext { a, b -> b.timestamp - a.timestamp }.minOrNull() ?: 3600L
-    val steps = prices.groupBy { Instant.ofEpochSecond(it.timestamp).atZone(zone).toLocalDate() }
-        .mapValues { (_, day) -> day.zipWithNext { a, b -> b.timestamp - a.timestamp }.minOrNull() ?: fallbackStep }
-    if (steps.values.any { it !in setOf(900L, 1800L, 3600L) }) {
-        throw InvalidPriceDataException("Unsupported Elering price interval")
-    }
+    // Nord Pool's 2025 delivery transition, verified against Elering for EE/FI/LV/LT.
+    // It happens at 01:00 locally, so choosing a resolution by local date is incorrect.
+    val quarterHourlyStart = Instant.parse("2025-09-30T22:00:00Z")
 
     return prices.map {
+        val start = Instant.ofEpochSecond(it.timestamp)
+        val step = if (start < quarterHourlyStart) 3600L else 900L
+        if (it.timestamp % step != 0L) throw InvalidPriceDataException("Elering price timestamp is not aligned to its interval")
         DomainEnergyPrice(
-            startTime = Instant.ofEpochSecond(it.timestamp),
+            startTime = start,
             // Convert MWh price to KWh price
             pricePerKWh = it.price / 1000.0,
-            durationSeconds = steps.getValue(Instant.ofEpochSecond(it.timestamp).atZone(zone).toLocalDate())
+            durationSeconds = step
         )
     }
 }
