@@ -3,6 +3,7 @@ package ee.innov.eprice.presentation
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.util.Locale
 
 @Serializable
 data class PriceData(
@@ -14,5 +15,5 @@ data class PriceData(
 
 fun DomainEnergyPrice.toPriceData() = PriceData(
     startTimeUTC = this.startTime.toString(),
-    price_eur_kwh = "%.5f".format(this.pricePerKWh)
+    price_eur_kwh = "%.5f".format(Locale.ROOT, this.pricePerKWh)
 )
