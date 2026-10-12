@@ -1,7 +1,6 @@
 package ee.innov.eprice.domain
 
 import ee.innov.eprice.data.entsoe.toBiddingZone
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.time.ZoneId
 import kotlin.test.assertEquals
@@ -23,7 +22,6 @@ class RegionResolutionRegressionTest {
     }
 
     @Test
-    @Tag("known-bug")
     fun `Nordic separator aliases resolve to the canonical area and timezone`() {
         listOf(
             Triple("no-1", "10YNO-1--------2", "Europe/Oslo"),
@@ -37,7 +35,6 @@ class RegionResolutionRegressionTest {
     }
 
     @Test
-    @Tag("known-bug")
     fun `normalization preserves hyphens inside raw EIC identifiers`() {
         val eic = "10YFI-1--------U"
         val code = "  ${eic.lowercase()}  ".normalizeCountryCode()
@@ -46,7 +43,6 @@ class RegionResolutionRegressionTest {
     }
 
     @Test
-    @Tag("known-bug")
     fun `known raw EIC identifiers retain the area timezone`() {
         assertEquals(
             ZoneId.of("Europe/Berlin"),

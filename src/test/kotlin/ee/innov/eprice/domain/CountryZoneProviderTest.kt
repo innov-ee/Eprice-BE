@@ -7,6 +7,7 @@ import ee.innov.eprice.domain.model.isFullDay
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import kotlin.test.assertFailsWith
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 import java.time.ZoneId
@@ -22,12 +23,12 @@ class CountryZoneProviderTest {
         assertEquals("DE_LU", "de-lu".normalizeCountryCode())
         assertEquals("DE_LU", "DE-LU".normalizeCountryCode())
         assertEquals("IT_NORD", "it-nord".normalizeCountryCode())
-        assertEquals("NO_1", "no-1".normalizeCountryCode())
-        assertEquals("SE_1", "se_1".normalizeCountryCode())
+        assertEquals("NO1", "no-1".normalizeCountryCode())
+        assertEquals("SE1", "se_1".normalizeCountryCode())
     }
 
     @Test
-    fun `getZoneId maps known countries correctly and defaults to Europe Tallinn`() {
+    fun `getZoneId maps known countries correctly and rejects unknown regions`() {
         assertEquals(ZoneId.of("Europe/Tallinn"), CountryZoneProvider.getZoneId("EE"))
         assertEquals(ZoneId.of("Europe/Helsinki"), CountryZoneProvider.getZoneId("FI"))
         assertEquals(ZoneId.of("Europe/Riga"), CountryZoneProvider.getZoneId("LV"))
@@ -41,7 +42,7 @@ class CountryZoneProviderTest {
         assertEquals(ZoneId.of("Europe/London"), CountryZoneProvider.getZoneId("UK"))
         assertEquals(ZoneId.of("Europe/Dublin"), CountryZoneProvider.getZoneId("IE"))
         assertEquals(ZoneId.of("Europe/Rome"), CountryZoneProvider.getZoneId("IT_NORD"))
-        assertEquals(ZoneId.of("Europe/Tallinn"), CountryZoneProvider.getZoneId("UNKNOWN"))
+        assertFailsWith<IllegalArgumentException> { CountryZoneProvider.getZoneId("UNKNOWN") }
     }
 
     @Test
