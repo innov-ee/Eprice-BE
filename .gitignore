@@ -10,6 +10,9 @@ build/
 *.iml
 *.iws
 
+# Local VS Code settings
+/.vscode/settings.json
+
 # Environment
 .env
 local.properties
