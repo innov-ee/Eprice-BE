@@ -3,6 +3,7 @@ name: Build and deploy to acc
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -58,6 +59,7 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Skip a stale main commit
         id: current
+        if: github.event_name == 'push'
         run: |
           head=$(git ls-remote origin refs/heads/main | cut -f1)
           if [[ "$head" == "$GITHUB_SHA" ]]; then
@@ -70,7 +72,7 @@ jobs:
   deploy:
     name: Deploy to acc
     needs: build
-    if: needs.build.outputs.current == 'true'
+    if: github.event_name == 'workflow_dispatch' || needs.build.outputs.current == 'true'
     uses: ./.github/workflows/deploy-vps.yml
     with:
       target: acc
