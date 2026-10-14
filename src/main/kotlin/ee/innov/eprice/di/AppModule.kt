@@ -20,6 +20,7 @@ import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
+import ee.innov.eprice.monitoring.ServiceLogs
 import ee.innov.eprice.security.KeyRotationService
 import ee.innov.eprice.util.getEnv
 import io.ktor.client.HttpClient
@@ -49,6 +50,7 @@ private fun resolveCachePath(fileName: String): Path {
 val appModule = module {
 
     single { ServiceMonitor() }
+    single { ServiceLogs() }
 
     single { KeyRotationService() }
 

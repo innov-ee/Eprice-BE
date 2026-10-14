@@ -1,12 +1,15 @@
 package ee.innov.eprice
 
 import ee.innov.eprice.di.appModule
+import ee.innov.eprice.monitoring.ServiceMonitor
+import ee.innov.eprice.monitoring.configureServiceLogs
 import ee.innov.eprice.presentation.priceRoutes
 import ee.innov.eprice.security.configureSecurity
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.application.log
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -15,6 +18,7 @@ import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.routing.routing
 import org.koin.core.module.Module
 import org.koin.ktor.plugin.Koin
+import org.koin.ktor.ext.inject
 import org.koin.logger.slf4jLogger
 
 fun main() {
@@ -48,9 +52,13 @@ fun Application.module(
         }
     }
 
+    configureServiceLogs()
+
     install(ContentNegotiation) {
         json() // Use kotlinx.serialization for JSON
     }
+    val monitor: ServiceMonitor by inject()
+    log.info("Service identity: ${monitor.identity}; startedAt=${monitor.startedAt}")
     install(CORS) {
         anyHost()
         allowHeader(HttpHeaders.ContentType)

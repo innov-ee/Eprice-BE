@@ -223,6 +223,39 @@
             gap: 16px;
         }
 
+        .service-identity {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 24px;
+            margin-bottom: 20px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .service-identity dd {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            overflow-wrap: anywhere;
+        }
+
+        .service-log-output {
+            height: 170px;
+            min-height: 120px;
+            resize: vertical;
+            overflow: auto;
+            background: var(--code-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 12px;
+            font: 0.75rem/1.6 var(--font-mono);
+            white-space: pre;
+        }
+
+        .service-log-line { padding: 3px 0; }
+        .service-log-line.info { color: var(--accent-blue); }
+        .service-log-line.warn { color: var(--accent-amber); }
+        .service-log-line.error { color: var(--accent-red); }
+
         .stat-box {
             background: var(--bg-primary);
             border: 1px solid var(--card-border);
@@ -679,6 +712,12 @@
                     </button>
                 </div>
             </div>
+            <dl class="service-identity" aria-label="Running service identity">
+                <div><dt>Commit</dt><dd id="identityCommit">--</dd></div>
+                <div><dt>Built</dt><dd id="identityBuiltAt">--</dd></div>
+                <div><dt>Instance</dt><dd id="identityInstance">--</dd></div>
+                <div><dt>Started</dt><dd id="identityStartedAt">--</dd></div>
+            </dl>
             <div class="stats-grid">
                 <div class="stat-box">
                     <div class="stat-label">System Uptime</div>
@@ -726,6 +765,28 @@
         </section>
 
         <!-- Main Layout: Endpoints (Left) + Response (Right) -->
+        <section class="monitor-card" aria-label="Service logs">
+            <div class="monitor-card-header">
+                <div>
+                    <h2 class="monitor-card-title">Service Logs</h2>
+                    <p class="stat-subtext">Latest 200 application entries · cleared on restart · times in Tallinn</p>
+                </div>
+                <div class="monitor-actions">
+                    <span id="serviceLogsStatus" class="last-updated-text" role="status">Loading...</span>
+                    <div class="auto-refresh">
+                        <label for="serviceLogLevel">Minimum level</label>
+                        <select id="serviceLogLevel" onchange="renderServiceLogs()">
+                            <option value="INFO">Info</option>
+                            <option value="WARN">Warn</option>
+                            <option value="ERROR">Error</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-sm" id="refreshServiceLogsBtn" onclick="refreshServiceLogs()">Refresh logs</button>
+                </div>
+            </div>
+            <div id="serviceLogOutput" class="service-log-output" tabindex="0" aria-label="Recent application log entries">Loading logs...</div>
+        </section>
+
         <div class="main-layout">
             <!-- Left Column: Catalog -->
             <div class="catalog-column">
@@ -877,7 +938,53 @@
         }
 
         // 2. Fetch Live Monitor Stats
+        let serviceLogEntries = [];
+        let serviceLogsLoading = false;
+
+        async function refreshServiceLogs() {
+            if (serviceLogsLoading) return;
+            serviceLogsLoading = true;
+            const button = document.getElementById("refreshServiceLogsBtn");
+            const status = document.getElementById("serviceLogsStatus");
+            button.disabled = true;
+            try {
+                const response = await fetch("/monitor/logs", { cache: "no-store" });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const snapshot = await response.json();
+                serviceLogEntries = snapshot.entries || [];
+                renderServiceLogs();
+                status.textContent = `${serviceLogEntries.length} entries · updated ${formatTallinnTimestamp(new Date().toISOString())}`;
+            } catch (error) {
+                status.textContent = `Logs unavailable (${error.message}) · displayed entries may be stale`;
+            } finally {
+                button.disabled = false;
+                serviceLogsLoading = false;
+            }
+        }
+
+        function renderServiceLogs() {
+            const output = document.getElementById("serviceLogOutput");
+            const followLatest = output.scrollHeight - output.scrollTop - output.clientHeight < 40;
+            const level = document.getElementById("serviceLogLevel").value;
+            const entries = serviceLogEntries.filter(entry => level === "INFO" || entry.level === level || (level === "WARN" && entry.level === "ERROR"));
+            output.replaceChildren();
+            if (!entries.length) {
+                output.textContent = "No matching log entries.";
+            } else {
+                for (const entry of entries) {
+                    const line = document.createElement("div");
+                    line.className = `service-log-line ${entry.level === "WARN" ? "warn" : entry.level === "ERROR" ? "error" : "info"}`;
+                    const levelLabel = entry.level.charAt(0) + entry.level.slice(1).toLowerCase();
+                    line.textContent = `${formatTallinnTimestamp(entry.timestamp)}  ${levelLabel}  ${entry.logger}  ${entry.message.replace(/\s*\r?\n\s*/g, " ⏎ ")}`;
+                    line.title = entry.message;
+                    output.appendChild(line);
+                }
+            }
+            if (followLatest) output.scrollTop = output.scrollHeight;
+        }
+
         async function refreshMonitor() {
+            refreshServiceLogs();
             const refreshBtn = document.getElementById("refreshMonitorBtn");
             if (refreshBtn) {
                 refreshBtn.innerHTML = `<span class="spinner"></span> Refresh`;
@@ -887,12 +994,19 @@
             try {
                 // Fetch stats and health in parallel
                 const [statsRes, healthRes] = await Promise.all([
-                    fetch("/monitor"),
-                    fetch("/health")
+                    fetch("/monitor", { cache: "no-store" }),
+                    fetch("/health", { cache: "no-store" })
                 ]);
 
                 if (statsRes.ok) {
                     const stats = await statsRes.json();
+                    const identity = stats.identity || {};
+                    const commit = document.getElementById("identityCommit");
+                    commit.textContent = (identity.commit || "unknown").slice(0, 12);
+                    commit.title = identity.commit || "unknown";
+                    document.getElementById("identityBuiltAt").textContent = formatTallinnTimestamp(identity.builtAt);
+                    document.getElementById("identityInstance").textContent = identity.instanceId || "unknown";
+                    document.getElementById("identityStartedAt").textContent = formatTallinnTimestamp(stats.startedAt);
                     document.getElementById("statUptime").textContent = stats.uptime || "--";
 
                     const inTotal = Number(stats.totalIncomingRequests || 0).toLocaleString();
@@ -1187,6 +1301,18 @@
         }
 
         // 6. Utility Helpers
+        function formatTallinnTimestamp(value) {
+            if (!value || value === "unknown") return "unknown";
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return "unknown";
+            return new Intl.DateTimeFormat("et-EE", {
+                timeZone: "Europe/Tallinn",
+                year: "numeric", month: "2-digit", day: "2-digit",
+                hour: "2-digit", minute: "2-digit", second: "2-digit",
+                hourCycle: "h23"
+            }).format(date).replace(",", "");
+        }
+
         function copyResponseJson() {
             if (!lastRawJsonResponse) return;
             navigator.clipboard.writeText(lastRawJsonResponse).then(() => {
