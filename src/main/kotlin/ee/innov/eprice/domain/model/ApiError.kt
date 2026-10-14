@@ -11,7 +11,7 @@ sealed class ApiError(
     override val message: String,
     open val details: String? = null,
     override val cause: Throwable? = null
-) : Throwable(message, cause) {
+) : Exception(message, cause) {
 
     data class Network(
         override val details: String,
@@ -49,6 +49,8 @@ class EleringApiException(val code: Int, val details: String) :
 
 class NoDataFoundException(details: String) : Exception(details)
 
+class InvalidPriceDataException(details: String) : Exception(details)
+
 // Helper function to map generic Throwables to our specific ApiError
 fun Throwable.toApiError(): ApiError {
     // If it's already an ApiError, just return it.
@@ -60,6 +62,7 @@ fun Throwable.toApiError(): ApiError {
         is HttpRequestTimeoutException -> ApiError.Timeout(details, this)
         is EntsoeApiException -> ApiError.Server(this.code, this.details, this)
         is EleringApiException -> ApiError.Server(this.code, this.details, this)
+        is InvalidPriceDataException -> ApiError.Server(502, details, this)
         is com.fasterxml.jackson.core.JsonProcessingException -> ApiError.Parsing(details, this)
         is SerializationException -> ApiError.Parsing(details, this)
         // You could add more specific network checks here, e.g.:

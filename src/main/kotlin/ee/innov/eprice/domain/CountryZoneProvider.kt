@@ -3,87 +3,41 @@ package ee.innov.eprice.domain
 import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
+
+private val biddingZoneCodeAliases = mapOf(
+    "DE-LU" to "DE_LU",
+    "IT-NORD" to "IT_NORD",
+    "IT-CNOR" to "IT_CNOR",
+    "IT-CSUD" to "IT_CSUD",
+    "IT-SUD" to "IT_SUD",
+    "IT-SICI" to "IT_SICI",
+    "IT-SARD" to "IT_SARD",
+    "IT-CALA" to "IT_CALA",
+    "NO-1" to "NO1", "NO_1" to "NO1",
+    "NO-2" to "NO2", "NO_2" to "NO2",
+    "NO-3" to "NO3", "NO_3" to "NO3",
+    "NO-4" to "NO4", "NO_4" to "NO4",
+    "NO-5" to "NO5", "NO_5" to "NO5",
+    "SE-1" to "SE1", "SE_1" to "SE1",
+    "SE-2" to "SE2", "SE_2" to "SE2",
+    "SE-3" to "SE3", "SE_3" to "SE3",
+    "SE-4" to "SE4", "SE_4" to "SE4",
+    "DK-1" to "DK1", "DK_1" to "DK1",
+    "DK-2" to "DK2", "DK_2" to "DK2"
+)
 
 /**
- * Normalizes country and bidding zone codes (e.g., " ee " -> "EE", "no-1" -> "NO_1").
+ * Normalizes case, whitespace and supported aliases (e.g., "no-1" -> "NO1").
+ * EIC identifiers retain their hyphens; supported areas are validated by BiddingZones.
  */
-fun String.normalizeCountryCode(): String =
-    this.trim().uppercase().replace('-', '_')
+fun String.normalizeCountryCode(): String {
+    val code = trim().uppercase(Locale.ROOT)
+    return biddingZoneCodeAliases[code] ?: code
+}
 
 object CountryZoneProvider {
-    private val defaultZoneId = ZoneId.of("Europe/Tallinn")
-
-    private val countryZoneMap: Map<String, ZoneId> = mapOf(
-        // Baltics
-        "EE" to ZoneId.of("Europe/Tallinn"),
-        "FI" to ZoneId.of("Europe/Helsinki"),
-        "LV" to ZoneId.of("Europe/Riga"),
-        "LT" to ZoneId.of("Europe/Vilnius"),
-
-        // Nordics (Bidding Zones)
-        "SE1" to ZoneId.of("Europe/Stockholm"),
-        "SE2" to ZoneId.of("Europe/Stockholm"),
-        "SE3" to ZoneId.of("Europe/Stockholm"),
-        "SE4" to ZoneId.of("Europe/Stockholm"),
-        "NO1" to ZoneId.of("Europe/Oslo"),
-        "NO2" to ZoneId.of("Europe/Oslo"),
-        "NO3" to ZoneId.of("Europe/Oslo"),
-        "NO4" to ZoneId.of("Europe/Oslo"),
-        "NO5" to ZoneId.of("Europe/Oslo"),
-        "DK1" to ZoneId.of("Europe/Copenhagen"),
-        "DK2" to ZoneId.of("Europe/Copenhagen"),
-
-        // Western & Central Europe
-        "DE" to ZoneId.of("Europe/Berlin"),
-        "DE_LU" to ZoneId.of("Europe/Berlin"),
-        "AT" to ZoneId.of("Europe/Vienna"),
-        "BE" to ZoneId.of("Europe/Brussels"),
-        "FR" to ZoneId.of("Europe/Paris"),
-        "NL" to ZoneId.of("Europe/Amsterdam"),
-        "CH" to ZoneId.of("Europe/Zurich"),
-        "PL" to ZoneId.of("Europe/Warsaw"),
-        "CZ" to ZoneId.of("Europe/Prague"),
-        "SK" to ZoneId.of("Europe/Bratislava"),
-        "HU" to ZoneId.of("Europe/Budapest"),
-        "SI" to ZoneId.of("Europe/Ljubljana"),
-        "HR" to ZoneId.of("Europe/Zagreb"),
-        "RO" to ZoneId.of("Europe/Bucharest"),
-        "BG" to ZoneId.of("Europe/Sofia"),
-        "GR" to ZoneId.of("Europe/Athens"),
-        "LU" to ZoneId.of("Europe/Luxembourg"),
-
-        // Iberia
-        "ES" to ZoneId.of("Europe/Madrid"),
-        "PT" to ZoneId.of("Europe/Lisbon"),
-
-        // British Isles
-        "GB" to ZoneId.of("Europe/London"),
-        "UK" to ZoneId.of("Europe/London"),
-        "IE" to ZoneId.of("Europe/Dublin"),
-
-        // Italy (Bidding Zones)
-        "IT_NORD" to ZoneId.of("Europe/Rome"),
-        "IT_CNOR" to ZoneId.of("Europe/Rome"),
-        "IT_CSUD" to ZoneId.of("Europe/Rome"),
-        "IT_SUD" to ZoneId.of("Europe/Rome"),
-        "IT_SICI" to ZoneId.of("Europe/Rome"),
-        "IT_SARD" to ZoneId.of("Europe/Rome"),
-        "IT_CALA" to ZoneId.of("Europe/Rome"),
-
-        // Southeastern Europe & Non-EU
-        "RS" to ZoneId.of("Europe/Belgrade"),
-        "ME" to ZoneId.of("Europe/Podgorica"),
-        "MK" to ZoneId.of("Europe/Skopje"),
-        "AL" to ZoneId.of("Europe/Tirane"),
-        "BA" to ZoneId.of("Europe/Sarajevo"),
-        "XK" to ZoneId.of("Europe/Belgrade"),
-        "UA" to ZoneId.of("Europe/Kyiv"),
-        "MD" to ZoneId.of("Europe/Chisinau")
-    )
-
-    fun getZoneId(countryCode: String): ZoneId =
-        countryZoneMap[countryCode]
-            ?: defaultZoneId
+    fun getZoneId(countryCode: String): ZoneId = BiddingZones.resolve(countryCode).zoneId
 
     /**
      * Calculates the expected number of hours for a specific date in the given timezone,

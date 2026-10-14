@@ -32,7 +32,7 @@ private data class CacheEntry(
 private typealias PriceCacheDto = Map<String, CacheEntry>
 
 class InMemoryPriceCache(
-    cacheFile: Path = Paths.get("eprice-cache.json"),
+    cacheFile: Path = Paths.get("eprice-cache-v2.json"),
     private val cacheDuration: Duration = Duration.ofMinutes(60)
 ) : BaseFileCache(cacheFile), PriceCache {
 

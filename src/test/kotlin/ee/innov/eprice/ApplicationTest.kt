@@ -4,6 +4,10 @@ import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.di.appModule
+import ee.innov.eprice.domain.GetEnergyPricesUseCase
+import ee.innov.eprice.domain.GetPriceStatisticsUseCase
+import ee.innov.eprice.domain.GetPriceSummaryUseCase
+import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.security.KeyRotationService
 import ee.innov.eprice.test.NoOpDailyAveragePriceCache
 import ee.innov.eprice.test.NoOpDailyStatsCache
@@ -68,7 +72,7 @@ class ApplicationTest {
 
     private val mockEntsoeSuccessXml = """
         <Publication_MarketDocument>
-            <TimeSeries>
+            <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
                 <Period>
                     <timeInterval>
                         <start>2023-01-01T00:00:00Z</start>
@@ -418,11 +422,52 @@ class ApplicationTest {
                 assertTrue(body.contains(""""cacheHits":0"""))
                 assertTrue(body.contains(""""cacheMisses":1"""))
                 assertTrue(body.contains(""""cacheHitRatio":0.0"""))
+                assertTrue(body.contains(""""identity":{"""))
+                assertTrue(body.contains(""""commit":"""))
+                assertTrue(body.contains(""""startedAt":"""))
             }
         )
     }
 
     // --- Security Integration Tests ---
+
+    @Test
+    fun `GET monitor logs returns captured startup logs to admin only`() = testApplication {
+        application { module(allowKoinOverrides = true) }
+        val auth = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:password".toByteArray())
+        val response = client.get("/monitor/logs") { header("Authorization", auth) }
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
+        val body = response.bodyAsText()
+        assertTrue(body.contains("Service identity:"))
+        assertTrue(body.contains("\"capacity\":200"))
+        assertTrue(body.contains("\"level\":\"INFO\""))
+    }
+
+    @Test
+    fun `GET monitor logs rejects unauthenticated bootstrap and operational clients`() = testApplication {
+        application { module(allowKoinOverrides = true) }
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/monitor/logs").status)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/monitor/logs") {
+            header("X-Bootstrap-Key", "test-bootstrap-key")
+        }.status)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/monitor/logs") {
+            header("X-API-Key", KeyRotationService().getKeyInfo().operationalKey)
+        }.status)
+    }
+
+    @Test
+    fun `monitor log appender is detached when application stops`() {
+        val root = org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as ch.qos.logback.classic.Logger
+        fun count() = root.iteratorForAppenders().asSequence().count { it is ee.innov.eprice.monitoring.ServiceLogAppender }
+        val before = count()
+        testApplication {
+            application { module(allowKoinOverrides = true) }
+            client.get("/health")
+            assertEquals(before + 1, count())
+        }
+        assertEquals(before, count())
+    }
 
     @Test
     fun `GET health should return 200 OK without any authentication`() = testApplication {
@@ -686,6 +731,11 @@ class ApplicationTest {
         val mockEngine = MockEngine(engineHandler)
 
         val testModule = module {
+            val clock = java.time.Clock.fixed(java.time.Instant.parse("2023-01-02T12:00:00Z"), java.time.ZoneOffset.UTC)
+            factory { GetEnergyPricesUseCase(get(), clock) }
+            factory { GetPriceStatisticsUseCase(get(), clock) }
+            factory { GetPriceSummaryUseCase(get(), clock) }
+            factory { GetRollingAveragePriceUseCase(get(), get(), clock) }
             single {
                 val monitor = get<ee.innov.eprice.monitoring.ServiceMonitor>()
                 HttpClient(mockEngine) {

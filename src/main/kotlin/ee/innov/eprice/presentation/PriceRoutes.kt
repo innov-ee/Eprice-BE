@@ -7,17 +7,19 @@ import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
-import ee.innov.eprice.domain.normalizeCountryCode
+import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.PriceStatsQuery
 import ee.innov.eprice.domain.model.PriceStatsQuery.NamedRange
 import ee.innov.eprice.monitoring.ServiceMonitor
+import ee.innov.eprice.monitoring.ServiceLogs
 import ee.innov.eprice.security.AUTH_ADMIN_BASIC
 import ee.innov.eprice.security.AUTH_BOOTSTRAP
 import ee.innov.eprice.security.AUTH_OPERATIONAL
 import ee.innov.eprice.security.KeyRotationService
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
 import io.ktor.http.Parameters
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationCallPipeline
@@ -48,6 +50,7 @@ fun Route.priceRoutes() {
     val dailyAveragePriceCache: DailyAveragePriceCache by inject()
     val dailyStatsCache: DailyStatsCache by inject()
     val monitor: ServiceMonitor by inject()
+    val serviceLogs: ServiceLogs by inject()
     val keyRotationService: KeyRotationService by inject()
 
     // Interceptor to count all incoming requests
@@ -82,6 +85,11 @@ fun Route.priceRoutes() {
             call.respond(HttpStatusCode.OK, monitor.getStats())
         }
 
+        get("/monitor/logs") {
+            call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+            call.respond(HttpStatusCode.OK, serviceLogs.snapshot())
+        }
+
         staticResources("/monitor.html", "static", index = "monitor.html")
 
         post("/api/cache/clear") {
@@ -111,8 +119,12 @@ fun Route.priceRoutes() {
             call.respond(HttpStatusCode.OK, EndpointCatalog.endpoints)
         }
 
+        get("/api/meta/regions") {
+            call.respond(HttpStatusCode.OK, configuredRegions())
+        }
+
         get("/api/prices/{countryCode?}") {
-            val countryCode = call.parameters["countryCode"]?.normalizeCountryCode() ?: "EE"
+            val countryCode = call.resolveRegionCode() ?: return@get
 
             val result = getEnergyPricesUseCase.execute(countryCode)
 
@@ -128,7 +140,7 @@ fun Route.priceRoutes() {
         }
 
         get("/api/prices/{countryCode}/avg") {
-            val countryCode = call.parameters["countryCode"]?.normalizeCountryCode() ?: "EE"
+            val countryCode = call.resolveRegionCode() ?: return@get
             val days = 5
             val result = getRollingAveragePriceUseCase.execute(countryCode, days)
 
@@ -141,7 +153,7 @@ fun Route.priceRoutes() {
         }
 
         get("/api/prices/{countryCode}/stats/summary") {
-            val countryCode = call.parameters["countryCode"]?.normalizeCountryCode() ?: "EE"
+            val countryCode = call.resolveRegionCode() ?: return@get
 
             val result = getPriceSummaryUseCase.execute(countryCode)
 
@@ -154,7 +166,7 @@ fun Route.priceRoutes() {
         }
 
         get("/api/prices/{countryCode}/stats") {
-            val countryCode = call.parameters["countryCode"]?.normalizeCountryCode() ?: "EE"
+            val countryCode = call.resolveRegionCode() ?: return@get
 
             val query = try {
                 parsePriceStatsQuery(call.request.queryParameters)
@@ -262,4 +274,10 @@ private suspend fun respondWithError(
             )
         }
     }
+}
+private suspend fun ApplicationCall.resolveRegionCode(): String? = try {
+    BiddingZones.resolve(parameters["countryCode"] ?: "EE").id
+} catch (e: IllegalArgumentException) {
+    respond(HttpStatusCode.BadRequest, ErrorResponse("Unsupported region", e.message))
+    null
 }

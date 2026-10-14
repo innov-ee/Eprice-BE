@@ -10,6 +10,9 @@ build/
 *.iml
 *.iws
 
+# Local VS Code settings
+/.vscode/settings.json
+
 # Environment
 .env
 local.properties
@@ -23,4 +26,7 @@ Thumbs.db
 /eprice-cache.json
 /daily-average-cache.json
 /daily-stats-cache.json
+/eprice-cache-v2.json*
+/daily-average-cache-v2.json*
+/daily-stats-cache-v2.json*
 /data/
