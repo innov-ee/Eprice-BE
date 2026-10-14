@@ -97,7 +97,7 @@ class ServiceLogsTest {
         appender.doAppend(event("ee.innov.eprice.test", Level.DEBUG))
         appender.doAppend(event("io.netty.test", Level.INFO))
         appender.doAppend(event("ee.innov.eprice.test", Level.ERROR).apply {
-            throwableProxy = ThrowableProxy(IllegalStateException("connection failed"))
+            setThrowableProxy(ThrowableProxy(IllegalStateException("connection failed")))
         })
         val entry = logs.snapshot().entries.single()
         assertEquals("ERROR", entry.level)
