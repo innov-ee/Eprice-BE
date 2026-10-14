@@ -13,11 +13,13 @@ import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.PriceStatsQuery
 import ee.innov.eprice.domain.model.PriceStatsQuery.NamedRange
 import ee.innov.eprice.monitoring.ServiceMonitor
+import ee.innov.eprice.monitoring.ServiceLogs
 import ee.innov.eprice.security.AUTH_ADMIN_BASIC
 import ee.innov.eprice.security.AUTH_BOOTSTRAP
 import ee.innov.eprice.security.AUTH_OPERATIONAL
 import ee.innov.eprice.security.KeyRotationService
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
 import io.ktor.http.Parameters
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationCallPipeline
@@ -48,6 +50,7 @@ fun Route.priceRoutes() {
     val dailyAveragePriceCache: DailyAveragePriceCache by inject()
     val dailyStatsCache: DailyStatsCache by inject()
     val monitor: ServiceMonitor by inject()
+    val serviceLogs: ServiceLogs by inject()
     val keyRotationService: KeyRotationService by inject()
 
     // Interceptor to count all incoming requests
@@ -80,6 +83,11 @@ fun Route.priceRoutes() {
     authenticate(AUTH_ADMIN_BASIC) {
         get("/monitor") {
             call.respond(HttpStatusCode.OK, monitor.getStats())
+        }
+
+        get("/monitor/logs") {
+            call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+            call.respond(HttpStatusCode.OK, serviceLogs.snapshot())
         }
 
         staticResources("/monitor.html", "static", index = "monitor.html")

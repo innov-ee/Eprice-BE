@@ -100,6 +100,15 @@ object EndpointCatalog {
         EndpointDoc(
             category = EndpointCategory.MONITORING,
             method = "GET",
+            path = "/monitor/logs",
+            description = "Recent application logs (admin only), with credentials redacted. Resets on restart.",
+            samples = listOf(
+                EndpointSample(label = "Recent Logs", path = "/monitor/logs")
+            )
+        ),
+        EndpointDoc(
+            category = EndpointCategory.MONITORING,
+            method = "GET",
             path = "/health",
             description = "Basic health check returning UP status.",
             samples = listOf(

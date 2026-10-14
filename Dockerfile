@@ -5,12 +5,20 @@ WORKDIR /home/gradle/src
 # Copy the *entire* project in first
 COPY . .
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+# Metadata travels inside the JAR when the tested image is promoted to prod.
+RUN printf 'commit=%s\nbuiltAt=%s\n' "$GIT_COMMIT" "$BUILD_TIME" > src/main/resources/build-info.properties
+
 # Run the 'buildFatJar' task explicitly to create the '-all.jar'
 RUN chmod +x ./gradlew && ./gradlew buildFatJar -x test --no-daemon
 
 # 2: Image that runs in the server, running the app built above.
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+
+ARG GIT_COMMIT=unknown
+LABEL org.opencontainers.image.revision=$GIT_COMMIT
 
 # Non-root user for security and cache directory setup
 RUN addgroup -S appgroup && \

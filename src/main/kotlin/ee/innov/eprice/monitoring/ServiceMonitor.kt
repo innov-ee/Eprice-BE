@@ -16,11 +16,14 @@ data class ServiceStats(
     val cacheMisses: Long,
     val cacheHitRatio: Double,
     val avgIncomingPerHour: Double,
-    val avgOutgoingPerHour: Double
+    val avgOutgoingPerHour: Double,
+    val identity: ServiceIdentity,
+    val startedAt: String
 )
 
-class ServiceMonitor {
+class ServiceMonitor(val identity: ServiceIdentity = ServiceIdentity.load()) {
     private val startTime = Instant.now()
+    val startedAt: String = startTime.toString()
     private val incomingCounter = AtomicLong(0)
     private val outgoingCounter = AtomicLong(0)
     private val outgoingEleringCounter = AtomicLong(0)
@@ -80,7 +83,9 @@ class ServiceMonitor {
             cacheMisses = misses,
             cacheHitRatio = hitRatio,
             avgIncomingPerHour = inTotal / hoursForAvg,
-            avgOutgoingPerHour = outTotal / hoursForAvg
+            avgOutgoingPerHour = outTotal / hoursForAvg,
+            identity = identity,
+            startedAt = startedAt
         )
     }
 
