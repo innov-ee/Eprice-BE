@@ -8,6 +8,7 @@ import ch.qos.logback.classic.spi.ThrowableProxyUtil
 import ch.qos.logback.core.AppenderBase
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.application.log
 import kotlinx.serialization.Serializable
 import org.koin.ktor.ext.inject
 import org.slf4j.LoggerFactory
@@ -74,10 +75,13 @@ internal class LogRedactor(environment: Map<String, String>) {
     }
 }
 
-internal class ServiceLogAppender(private val logs: ServiceLogs) : AppenderBase<ILoggingEvent>() {
+internal class ServiceLogAppender(
+    private val logs: ServiceLogs,
+    private val applicationLoggerName: String = "ktor.application"
+) : AppenderBase<ILoggingEvent>() {
     override fun append(event: ILoggingEvent) {
         if (!event.level.isGreaterOrEqual(Level.INFO)) return
-        if (!event.loggerName.startsWith("ee.innov.eprice.") && event.loggerName != "ktor.application") return
+        if (!event.loggerName.startsWith("ee.innov.eprice.") && event.loggerName != applicationLoggerName) return
         val exception = event.throwableProxy?.let { "\n" + ThrowableProxyUtil.asString(it) }.orEmpty()
         logs.record(Instant.ofEpochMilli(event.timeStamp), event.level.toString(), event.loggerName, event.formattedMessage + exception)
     }
@@ -87,7 +91,7 @@ fun Application.configureServiceLogs() {
     val logs: ServiceLogs by inject()
     val context = LoggerFactory.getILoggerFactory() as LoggerContext
     val root = context.getLogger(Logger.ROOT_LOGGER_NAME)
-    val appender = ServiceLogAppender(logs).apply {
+    val appender = ServiceLogAppender(logs, log.name).apply {
         this.context = context
         start()
     }
