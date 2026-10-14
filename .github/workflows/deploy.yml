@@ -1,85 +1,80 @@
-name: Build and Deploy to Production VPS
+name: Build and deploy to acc
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: acc-deployment
+  cancel-in-progress: false
+
 jobs:
-  build-and-deploy:
-    name: Build, Push, and Deploy
+  build:
+    name: Test and build
     runs-on: ubuntu-latest
-
-    # Grant GITHUB_TOKEN permissions to write to GHCR (packages)
-    permissions:
-      contents: read
-      packages: write
-
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+      current: ${{ steps.current.outputs.current }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Run tests
+        run: bash ./gradlew test --console=plain
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          # GITHUB_TOKEN is automatically created by Actions
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Define Image Name
+          password: ${{ github.token }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Select commit image
+        id: image
         run: |
-          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE_NAME=ghcr.io/$REPO_NAME" >> $GITHUB_ENV
-
-      - name: Build and push Docker image
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:$GITHUB_SHA"
+          echo "name=$image" >> "$GITHUB_OUTPUT"
+          if result=$(docker buildx imagetools inspect "$image" 2>&1); then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          elif [[ "$result" == *'not found'* || "$result" == *'manifest unknown'* ]]; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$result" >&2
+            exit 1
+          fi
+      - name: Build and push image once
+        if: steps.image.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.IMAGE_NAME }}:latest
+          tags: ${{ steps.image.outputs.name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Skip a stale main commit
+        id: current
+        if: github.event_name == 'push'
+        run: |
+          head=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$head" == "$GITHUB_SHA" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+            echo 'A newer main commit exists; skipping deployment.'
+          fi
 
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          GITHUB_SHA: ${{ github.sha }}
-          GH_USER: ${{ github.repository_owner }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
-          BOOTSTRAP_KEYS: ${{ secrets.BOOTSTRAP_KEYS }}
-          MASTER_SECRET: ${{ secrets.MASTER_SECRET }}
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-        with:
-          host: ${{ secrets.VPS_SSH_HOST }}
-          username: ${{ secrets.VPS_SSH_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          # Pass the GitHub Actions env variables safely into the remote SSH session
-          envs: IMAGE_NAME,GITHUB_SHA,GH_USER,GH_TOKEN,ENTSOE_API_KEY,BOOTSTRAP_KEYS,MASTER_SECRET,ADMIN_USERNAME,ADMIN_PASSWORD
-          script: |
-            APP_DIR="/home/deployer/Eprice-BE"
-            IMAGE_TO_DEPLOY="${IMAGE_NAME}:${GITHUB_SHA}"
-            
-            # 1. Securely create the .env file on the server (quoted to handle spaces)
-            cat <<EOF > $APP_DIR/.env
-            ENTSOE_API_KEY="${ENTSOE_API_KEY}"
-            BOOTSTRAP_KEYS="${BOOTSTRAP_KEYS}"
-            MASTER_SECRET="${MASTER_SECRET}"
-            ADMIN_USERNAME="${ADMIN_USERNAME}"
-            ADMIN_PASSWORD="${ADMIN_PASSWORD}"
-            EOF
-            
-            # 2. Log in to GHCR on the VPS
-            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
-            
-            # 3. Run the deploy script
-            bash /home/deployer/deploy.sh "$IMAGE_TO_DEPLOY"
+  deploy:
+    name: Deploy to acc
+    needs: build
+    if: github.event_name == 'workflow_dispatch' || needs.build.outputs.current == 'true'
+    uses: ./.github/workflows/deploy-vps.yml
+    with:
+      target: acc
+      image: ${{ needs.build.outputs.image }}
+    secrets: inherit

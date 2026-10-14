@@ -1,0 +1,61 @@
+name: Deploy existing image
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      image:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy application
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          TARGET: ${{ inputs.target }}
+          APP_IMAGE: ${{ inputs.image }}
+          GH_USER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ github.token }}
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+          BOOTSTRAP_KEYS: ${{ secrets.BOOTSTRAP_KEYS }}
+          MASTER_SECRET: ${{ secrets.MASTER_SECRET }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: TARGET,APP_IMAGE,GH_USER,GH_TOKEN,ENTSOE_API_KEY,BOOTSTRAP_KEYS,MASTER_SECRET,ADMIN_USERNAME,ADMIN_PASSWORD
+          script: |
+            set -e
+            case "$TARGET" in
+              acc)
+                APP_DIR=/home/deployer/Eprice-BE-acc
+                DEPLOY_SCRIPT=/home/deployer/deploy-acc.sh
+                ;;
+              prod)
+                APP_DIR=/home/deployer/Eprice-BE
+                DEPLOY_SCRIPT=/home/deployer/deploy.sh
+                ;;
+              *) echo "Unknown deployment target" >&2; exit 1 ;;
+            esac
+            cat <<EOF_ENV > "$APP_DIR/.env"
+            ENTSOE_API_KEY="${ENTSOE_API_KEY}"
+            BOOTSTRAP_KEYS="${BOOTSTRAP_KEYS}"
+            MASTER_SECRET="${MASTER_SECRET}"
+            ADMIN_USERNAME="${ADMIN_USERNAME}"
+            ADMIN_PASSWORD="${ADMIN_PASSWORD}"
+            EOF_ENV
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
+            bash "$DEPLOY_SCRIPT" "$APP_IMAGE"
