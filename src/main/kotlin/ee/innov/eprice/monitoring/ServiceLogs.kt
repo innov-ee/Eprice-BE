@@ -25,7 +25,7 @@ data class ServiceLogSnapshot(val entries: List<ServiceLogEntry>, val capacity: 
 
 /** A bounded, process-local tail. Secrets are removed before anything is retained. */
 class ServiceLogs(
-    private val capacity: Int = 200,
+    private val capacity: Int = 1000,
     environment: Map<String, String> = System.getenv()
 ) {
     private val entries = ArrayDeque<ServiceLogEntry>()

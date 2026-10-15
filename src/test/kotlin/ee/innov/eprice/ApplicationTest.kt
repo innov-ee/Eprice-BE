@@ -440,7 +440,7 @@ class ApplicationTest {
         assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
         val body = response.bodyAsText()
         assertTrue(body.contains("Service identity:"))
-        assertTrue(body.contains("\"capacity\":200"))
+        assertTrue(body.contains("\"capacity\":1000"))
         assertTrue(body.contains("\"level\":\"INFO\""))
     }
 
