@@ -23,13 +23,10 @@ jobs:
       current: ${{ steps.current.outputs.current }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          java-version: '21'
-          distribution: temurin
-      - uses: gradle/actions/setup-gradle@v5
+      # Tests are ran as a composite action instead of a separate workflow to avoid the overhead of starting new workflow.
       - name: Run tests
-        run: bash ./gradlew test --console=plain
+        uses: ./.github/actions/run-tests
+      # Docker registry to store our images so its easier for other scripts to fetch later
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io

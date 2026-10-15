@@ -6,6 +6,7 @@ on:
       - main
   workflow_dispatch: # Allows to run this workflow manually
 
+# Tests job is almost just a wrapper around the `run-tests` action
 jobs:
   test:
     name: All Tests
@@ -15,17 +16,5 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up JDK
-        uses: actions/setup-java@v5
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
-
       - name: Run tests
-        run: ./gradlew test
+        uses: ./.github/actions/run-tests
