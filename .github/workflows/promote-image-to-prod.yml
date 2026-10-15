@@ -51,7 +51,7 @@ jobs:
           script: |
             const repo = { owner: context.repo.owner, repo: context.repo.repo };
             const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-              ...repo, workflow_id: 'deploy.yml', head_sha: process.env.RELEASE_SHA,
+              ...repo, workflow_id: 'build-and-deploy-acc.yml', head_sha: process.env.RELEASE_SHA,
               event: 'push', status: 'success', per_page: 100
             });
             for (const run of runs) {
@@ -78,7 +78,7 @@ jobs:
   deploy:
     name: Deploy to prod
     needs: prepare
-    uses: ./.github/workflows/deploy-vps.yml
+    uses: ./.github/workflows/deploy-image.yml
     with:
       target: prod
       image: ${{ needs.prepare.outputs.image }}

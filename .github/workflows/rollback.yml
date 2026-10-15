@@ -46,7 +46,7 @@ jobs:
   deploy:
     name: Restore prod image
     needs: prepare
-    uses: ./.github/workflows/deploy-vps.yml
+    uses: ./.github/workflows/deploy-image.yml
     with:
       target: prod
       image: ${{ needs.prepare.outputs.image }}

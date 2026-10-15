@@ -2,7 +2,8 @@ name: Build and deploy to acc
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -73,7 +74,7 @@ jobs:
     name: Deploy to acc
     needs: build
     if: github.event_name == 'workflow_dispatch' || needs.build.outputs.current == 'true'
-    uses: ./.github/workflows/deploy-vps.yml
+    uses: ./.github/workflows/deploy-image.yml
     with:
       target: acc
       image: ${{ needs.build.outputs.image }}
