@@ -17,7 +17,7 @@ ci-tests.yml
 
 build-and-deploy-acc.yml
 * Builds the docker image
-* invokes deploy to ACC
+* invokes `deploy-image.yml` to deploy to ACC
 
 deploy-image.yml
 * Contains actual deployment logic to VPS
@@ -25,8 +25,8 @@ deploy-image.yml
 
 promote-image-to-prod.yml
 * Looks up the ACC image for selected commit
-* invokes deploy to PROD
+* invokes `deploy-image.yml` to deploy to PROD
 
 rollback.yml
 * Looks up the image for the release tag you specify
-* invokes deploy to PROD
+* invokes `deploy-image.yml` to deploy to PROD
