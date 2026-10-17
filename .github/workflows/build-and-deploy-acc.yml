@@ -75,6 +75,6 @@ jobs:
     uses: ./.github/workflows/deploy-image.yml
     # deploy workflow params: environment and image coordinates
     with:
-      target: acc
+      target_environment: acc
       image: ${{ needs.build.outputs.image }}
     secrets: inherit

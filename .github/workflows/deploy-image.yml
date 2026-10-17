@@ -3,7 +3,7 @@ name: Deploy existing image
 on:
   workflow_call:
     inputs:
-      target:
+      target_environment:
         type: string
         required: true
       image:
@@ -23,7 +23,7 @@ jobs:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         env:
-          TARGET: ${{ inputs.target }}
+          TARGET: ${{ inputs.target_environment }}
           APP_IMAGE: ${{ inputs.image }}
           GH_USER: ${{ github.repository_owner }}
           GH_TOKEN: ${{ github.token }}

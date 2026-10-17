@@ -48,6 +48,6 @@ jobs:
     needs: prepare
     uses: ./.github/workflows/deploy-image.yml
     with:
-      target: prod
+      target_environment: prod
       image: ${{ needs.prepare.outputs.image }}
     secrets: inherit
