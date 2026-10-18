@@ -43,6 +43,7 @@ jobs:
           BUMP: ${{ inputs.bump }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: bash .github/scripts/resolve-release.sh release
+      # A hacky gh script that checks for successful ACC build on this hash (so theres smth to promote)
       - name: Require successful acc deployment
         uses: actions/github-script@v8
         env:
