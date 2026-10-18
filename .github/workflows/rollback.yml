@@ -21,7 +21,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     outputs:
-      image: ${{ steps.image.outputs.name }}
+      image: ${{ steps.image.outputs.image }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -41,13 +41,13 @@ jobs:
         id: image
         env:
           RELEASE_SHA: ${{ steps.version.outputs.sha }}
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_SHA" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: Restore prod image
     needs: prepare
-    uses: ./.github/workflows/deploy-vps.yml
+    uses: ./.github/workflows/deploy-image.yml
     with:
-      target: prod
+      target_environment: prod
       image: ${{ needs.prepare.outputs.image }}
     secrets: inherit

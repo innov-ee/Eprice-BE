@@ -1,0 +1,23 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # Allows to run this workflow manually
+
+permissions:
+  contents: read
+
+# Tests job is almost just a wrapper around the `run-tests` action
+jobs:
+  test:
+    name: All Tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run tests
+        uses: ./.github/actions/run-tests

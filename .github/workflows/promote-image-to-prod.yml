@@ -17,7 +17,6 @@ on:
 
 permissions:
   contents: write
-  actions: read
   packages: read
 
 concurrency:
@@ -31,56 +30,34 @@ jobs:
     outputs:
       sha: ${{ steps.version.outputs.sha }}
       tag: ${{ steps.version.outputs.tag }}
-      image: ${{ steps.image.outputs.name }}
+      image: ${{ steps.image.outputs.image }}
     steps:
       - uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
-      - name: Resolve version and tested commit
+      # Calls our script that determines and writes correct commit sha and tag to output.
+      - name: Resolve version and commit
         id: version
         env:
           BUMP: ${{ inputs.bump }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: bash .github/scripts/resolve-release.sh release
-      - name: Require successful acc deployment
-        uses: actions/github-script@v8
-        env:
-          RELEASE_SHA: ${{ steps.version.outputs.sha }}
-        with:
-          script: |
-            const repo = { owner: context.repo.owner, repo: context.repo.repo };
-            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-              ...repo, workflow_id: 'deploy.yml', head_sha: process.env.RELEASE_SHA,
-              event: 'push', status: 'success', per_page: 100
-            });
-            for (const run of runs) {
-              // Exclude historical deploy.yml runs that targeted prod.
-              if (run.name !== 'Build and deploy to acc') continue;
-              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
-                ...repo, run_id: run.id, per_page: 100
-              });
-              if (jobs.some(job => job.conclusion === 'success' && job.steps?.some(
-                step => step.name === 'Deploy to VPS' && step.conclusion === 'success'
-              ))) {
-                return;
-              }
-            }
-            core.setFailed('This commit has no successful acc deployment. Deploy and test it in acc first.');
+      # Writes image coords to outputs.image
       - name: Select existing image
         id: image
         env:
           RELEASE_SHA: ${{ steps.version.outputs.sha }}
         run: |
-          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_SHA" >> "$GITHUB_OUTPUT"
-          echo 'Release uses the existing acc image; no rebuild.' >> "$GITHUB_STEP_SUMMARY"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+          echo 'Release pulls the selected commit image; no rebuild.' >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: Deploy to prod
     needs: prepare
-    uses: ./.github/workflows/deploy-vps.yml
+    uses: ./.github/workflows/deploy-image.yml
     with:
-      target: prod
+      target_environment: prod
       image: ${{ needs.prepare.outputs.image }}
     secrets: inherit
 

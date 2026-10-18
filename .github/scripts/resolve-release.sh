@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve release/rollback inputs against fetched main and tags.
+# Figures out which commit and tag to user for release
+# Note either of them may or may not have been provided depending on where workflow was started
+# Writes them to $GITHUB_OUTPUT
+
 mode=${1:?Expected release or rollback}
 version_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
 

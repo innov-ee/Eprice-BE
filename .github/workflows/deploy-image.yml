@@ -1,0 +1,77 @@
+name: Deploy existing image
+
+on:
+  workflow_call:
+    # Params for this workflow when other flows here call it
+    inputs:
+      target_environment:
+        type: string
+        required: true
+      image:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy application
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # Picks appropriate deploy folder and script (acc vs prod)
+      - name: Select deployment target
+        id: target
+        env:
+          TARGET: ${{ inputs.target_environment }}
+        run: |
+          case "$TARGET" in
+            acc)
+              APP_DIR=/home/deployer/Eprice-BE-acc
+              DEPLOY_SCRIPT=/home/deployer/deploy-acc.sh
+              ;;
+            prod)
+              APP_DIR=/home/deployer/Eprice-BE
+              DEPLOY_SCRIPT=/home/deployer/deploy.sh
+              ;;
+            *) echo "Unknown deployment target" >&2; exit 1 ;;
+          esac
+          echo "app_dir=$APP_DIR" >> "$GITHUB_OUTPUT"
+          echo "deploy_script=$DEPLOY_SCRIPT" >> "$GITHUB_OUTPUT"
+
+      # SSHs to VPS and invokes the deploy script (which pulls docker image and runs it)
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        # Sets up env values for ssh-action process
+        env:
+          APP_DIR: ${{ steps.target.outputs.app_dir }}
+          DEPLOY_SCRIPT: ${{ steps.target.outputs.deploy_script }}
+          APP_IMAGE: ${{ inputs.image }}
+          GH_USER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ github.token }}
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+          BOOTSTRAP_KEYS: ${{ secrets.BOOTSTRAP_KEYS }}
+          MASTER_SECRET: ${{ secrets.MASTER_SECRET }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        # Sets up arguments for ssh-action
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # Env values that ssh-action has to forward to host (VPS) for the script to work.
+          envs: APP_DIR,DEPLOY_SCRIPT,APP_IMAGE,GH_USER,GH_TOKEN,ENTSOE_API_KEY,BOOTSTRAP_KEYS,MASTER_SECRET,ADMIN_USERNAME,ADMIN_PASSWORD
+          # Creates .env file for docker-compose and runs the deploy script (defined in infra project; mby move here)
+          script: |
+            set -e
+            cat <<EOF_ENV > "$APP_DIR/.env"
+            ENTSOE_API_KEY="${ENTSOE_API_KEY}"
+            BOOTSTRAP_KEYS="${BOOTSTRAP_KEYS}"
+            MASTER_SECRET="${MASTER_SECRET}"
+            ADMIN_USERNAME="${ADMIN_USERNAME}"
+            ADMIN_PASSWORD="${ADMIN_PASSWORD}"
+            EOF_ENV
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
+            bash "$DEPLOY_SCRIPT" "$APP_IMAGE"

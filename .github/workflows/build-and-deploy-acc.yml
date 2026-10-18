@@ -1,0 +1,81 @@
+name: Build and deploy to acc
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: acc-deployment
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test and build
+    # GitHub VM where this job will run
+    runs-on: ubuntu-24.04
+    # Job output for others to use, ${{ }} is gh actions expression. Evaluated at appropriate time (end of job for outputs)
+    # `image` step writes `image=value` to this jobs $GITHUB_OUTPUT file. gh exposes that value as steps.image.outputs.image.
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+      current: ${{ steps.current.outputs.current }}
+    steps:
+      - uses: actions/checkout@v5
+      # Tests are ran as a composite action instead of a separate workflow to avoid the overhead of starting new job.
+      # Meaning this step uses the same `build` jobs VM, instead of creating a separate job and VM with its setup.
+      - name: Run tests
+        uses: ./.github/actions/run-tests
+      # Allows using docker registry to easily share/find our images later. Logs in to docker, prepares credentials etc.
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
+      - uses: docker/setup-buildx-action@v4
+      # Writes the coordinates of image to outputs.image / steps.image.outputs.image / $GITHUB_OUTPUT
+      - name: Select commit image
+        # Labels this step so it can be referred when resolving outputs (steps.image.outputs.image)
+        id: image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:$GITHUB_SHA"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          # Coordinates where image will be pushed to
+          tags: ${{ steps.image.outputs.image }}
+          cache-from: type=gha # using cache of github actions
+          cache-to: type=gha,mode=max
+      # Step to skip ACC deploy if a new commit been pushed meanwhile
+      # Sets `outputs.current` which `Deploy to acc` uses do decide if it should run
+      - name: Skip a stale main commit
+        id: current
+        if: github.event_name == 'push'
+        run: |
+          head=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$head" == "$GITHUB_SHA" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+            echo 'A newer main commit exists; skipping deployment.'
+          fi
+
+  deploy:
+    name: Deploy to acc
+    # declares that `build` job must happen before this job.
+    needs: build
+    # reads build jobs outputs.current to decide if its allowed to proceed (i.e. deploy)
+    if: github.event_name == 'workflow_dispatch' || needs.build.outputs.current == 'true'
+    uses: ./.github/workflows/deploy-image.yml
+    # deploy workflow params: environment and image coordinates
+    with:
+      target_environment: acc
+      image: ${{ needs.build.outputs.image }}
+    secrets: inherit
