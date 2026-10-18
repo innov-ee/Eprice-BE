@@ -2,6 +2,7 @@ name: Deploy existing image
 
 on:
   workflow_call:
+    # Params for this workflow when other flows here call it
     inputs:
       target_environment:
         type: string
@@ -22,6 +23,7 @@ jobs:
     steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
+        # Sets up env values for ssh-action process
         env:
           TARGET: ${{ inputs.target_environment }}
           APP_IMAGE: ${{ inputs.image }}
@@ -32,10 +34,12 @@ jobs:
           MASTER_SECRET: ${{ secrets.MASTER_SECRET }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        # Sets up arguments that ssh-action requires
         with:
           host: ${{ secrets.VPS_SSH_HOST }}
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # Env values that ssh-action has to forward to host (VPS) for the script to work.
           envs: TARGET,APP_IMAGE,GH_USER,GH_TOKEN,ENTSOE_API_KEY,BOOTSTRAP_KEYS,MASTER_SECRET,ADMIN_USERNAME,ADMIN_PASSWORD
           script: |
             set -e
