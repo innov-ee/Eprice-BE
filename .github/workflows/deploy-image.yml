@@ -41,6 +41,7 @@ jobs:
           echo "app_dir=$APP_DIR" >> "$GITHUB_OUTPUT"
           echo "deploy_script=$DEPLOY_SCRIPT" >> "$GITHUB_OUTPUT"
 
+      # SSHs to VPS and invokes the deploy script (which pulls docker image and runs it)
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         # Sets up env values for ssh-action process
@@ -62,7 +63,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           # Env values that ssh-action has to forward to host (VPS) for the script to work.
           envs: APP_DIR,DEPLOY_SCRIPT,APP_IMAGE,GH_USER,GH_TOKEN,ENTSOE_API_KEY,BOOTSTRAP_KEYS,MASTER_SECRET,ADMIN_USERNAME,ADMIN_PASSWORD
-          # creates .env file for docker and runs the deploy script (defined in infra project; mby move here)
+          # Creates .env file for docker-compose and runs the deploy script (defined in infra project; mby move here)
           script: |
             set -e
             cat <<EOF_ENV > "$APP_DIR/.env"
