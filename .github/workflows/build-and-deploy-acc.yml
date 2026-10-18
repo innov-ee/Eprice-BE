@@ -17,9 +17,9 @@ concurrency:
 jobs:
   build:
     name: Test and build
-    # Github VM where this job will run
+    # GitHub VM where this job will run
     runs-on: ubuntu-24.04
-    # job output for others to use, ${{ }} is gh actions expression. Evaluated at appropriate time (end of job for outputs)
+    # Job output for others to use, ${{ }} is gh actions expression. Evaluated at appropriate time (end of job for outputs)
     # `image` step writes `name=value` to this jobs $GITHUB_OUTPUT file. gh exposes that value as steps.image.outputs.name.
     outputs:
       image: ${{ steps.image.outputs.name }}
@@ -39,6 +39,7 @@ jobs:
       - uses: docker/setup-buildx-action@v4
       # Writes the coordinates of image to outputs.image / steps.image.outputs.name / $GITHUB_OUTPUT
       - name: Select commit image
+        # Labels this step so it can be referred when resolving outputs (steps.image.outputs.name)
         id: image
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}:$GITHUB_SHA"
@@ -53,7 +54,7 @@ jobs:
           cache-from: type=gha # using cache of github actions
           cache-to: type=gha,mode=max
       # Step to skip ACC deploy if a new commit been pushed meanwhile
-      # Sets outputs.current which `Deploy to acc` uses do know if it should run
+      # Sets `outputs.current` which `Deploy to acc` uses do decide if it should run
       - name: Skip a stale main commit
         id: current
         if: github.event_name == 'push'
