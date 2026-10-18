@@ -20,9 +20,9 @@ jobs:
     # GitHub VM where this job will run
     runs-on: ubuntu-24.04
     # Job output for others to use, ${{ }} is gh actions expression. Evaluated at appropriate time (end of job for outputs)
-    # `image` step writes `name=value` to this jobs $GITHUB_OUTPUT file. gh exposes that value as steps.image.outputs.name.
+    # `image` step writes `image=value` to this jobs $GITHUB_OUTPUT file. gh exposes that value as steps.image.outputs.image.
     outputs:
-      image: ${{ steps.image.outputs.name }}
+      image: ${{ steps.image.outputs.image }}
       current: ${{ steps.current.outputs.current }}
     steps:
       - uses: actions/checkout@v5
@@ -37,20 +37,20 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
       - uses: docker/setup-buildx-action@v4
-      # Writes the coordinates of image to outputs.image / steps.image.outputs.name / $GITHUB_OUTPUT
+      # Writes the coordinates of image to outputs.image / steps.image.outputs.image / $GITHUB_OUTPUT
       - name: Select commit image
-        # Labels this step so it can be referred when resolving outputs (steps.image.outputs.name)
+        # Labels this step so it can be referred when resolving outputs (steps.image.outputs.image)
         id: image
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}:$GITHUB_SHA"
-          echo "name=$image" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
       - name: Build and push image
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
           # Coordinates where image will be pushed to
-          tags: ${{ steps.image.outputs.name }}
+          tags: ${{ steps.image.outputs.image }}
           cache-from: type=gha # using cache of github actions
           cache-to: type=gha,mode=max
       # Step to skip ACC deploy if a new commit been pushed meanwhile

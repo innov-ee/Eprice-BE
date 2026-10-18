@@ -30,7 +30,7 @@ jobs:
     outputs:
       sha: ${{ steps.version.outputs.sha }}
       tag: ${{ steps.version.outputs.tag }}
-      image: ${{ steps.image.outputs.name }}
+      image: ${{ steps.image.outputs.image }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -43,13 +43,13 @@ jobs:
           BUMP: ${{ inputs.bump }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: bash .github/scripts/resolve-release.sh release
-      # Writes image coords to outputs.name / outputs.image
+      # Writes image coords to outputs.image
       - name: Select existing image
         id: image
         env:
           RELEASE_SHA: ${{ steps.version.outputs.sha }}
         run: |
-          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_SHA" >> "$GITHUB_OUTPUT"
           echo 'Release pulls the selected commit image; no rebuild.' >> "$GITHUB_STEP_SUMMARY"
 
   deploy:

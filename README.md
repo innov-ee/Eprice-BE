@@ -19,16 +19,18 @@
 ## Deployment and releases
 
 Pull requests run tests. Merging into `main` runs tests, builds a commit-tagged
-Docker image once and deploys it to **acc** at https://api-acc.innov.ee.
+Docker image and deploys it to **acc** at https://api-acc.innov.ee.
+Rerunning the workflow rebuilds and replaces the image under the same commit tag.
 Feature branch pushes do not deploy. The acc admin panel is
 https://api-acc.innov.ee/monitor.html; it uses the existing admin credentials.
 
 After testing acc, run **Release** in GitHub Actions from `main`. The version bump
 defaults to `minor`; choose `major` for an initial `v1.0.0`. The optional commit
 field accepts a full tested commit SHA; blank uses the commit captured when that
-workflow run started. The workflow requires that commit to belong to `main` and
-have a successful acc deployment. It deploys the existing image to prod, then
-creates the version tag and GitHub Release after success.
+workflow run started. The workflow requires that commit to belong to `main`. It pulls the existing
+image tagged with that commit SHA and deploys it to prod; a missing image causes
+the deployment to fail. It creates the version tag and GitHub Release after
+success. Acceptance deployment history is not checked.
 
 You can also release from Git, using a new version tag on a tested commit:
 
