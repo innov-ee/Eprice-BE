@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch: # Allows to run this workflow manually
 
+permissions:
+  contents: read
+
 # Tests job is almost just a wrapper around the `run-tests` action
 jobs:
   test:
