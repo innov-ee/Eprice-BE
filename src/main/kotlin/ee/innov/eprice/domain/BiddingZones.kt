@@ -63,12 +63,8 @@ object BiddingZones {
         BiddingZone("MD", "10Y1001A1001A990", ZoneId.of("Europe/Chisinau")),
     )
     private val byId = all.associateBy { it.id }
-    private val byEic = all.associateBy { it.eic }
-    private val aliases = mapOf("DE" to "DE_LU", "LU" to "DE_LU", "UK" to "GB")
-
-    fun resolve(code: String): BiddingZone {
-        val normalized = code.normalizeCountryCode()
-        return byEic[normalized] ?: byId[aliases[normalized] ?: normalized]
+    /** Accept only canonical API identifiers; provider EICs remain internal. */
+    fun resolve(code: String): BiddingZone =
+        byId[code]
             ?: throw IllegalArgumentException("Unsupported country or bidding zone code: $code")
-    }
 }

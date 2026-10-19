@@ -1,7 +1,6 @@
 package ee.innov.eprice.domain
 
 import ee.innov.eprice.domain.model.DomainEnergyPrice
-import ee.innov.eprice.domain.model.inRange
 import java.time.Clock
 import java.time.LocalDate
 
@@ -17,7 +16,7 @@ class GetEnergyPricesUseCase(
      * @return A Result containing the list of prices or an error.
      */
     suspend fun execute(countryCode: String): Result<List<DomainEnergyPrice>> {
-        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val zoneId = BiddingZones.resolve(countryCode).zoneId
         val today = LocalDate.now(clock.withZone(zoneId))
 
         // Business logic: Set periodStart to the beginning of yesterday in the country's local timezone
@@ -26,6 +25,6 @@ class GetEnergyPricesUseCase(
         // Business logic: Set periodEnd to the end of tomorrow in the country's local timezone
         val end = today.plusDays(2).atStartOfDay(zoneId).toInstant()
 
-        return energyPriceRepository.getPrices(countryCode, start, end).map { it.inRange(start, end) }
+        return energyPriceRepository.getPrices(countryCode, start, end)
     }
 }

@@ -26,7 +26,7 @@ class GetPriceSummaryUseCase(
     }
 
     suspend fun execute(countryCode: String): Result<PriceSummaryStatistics> {
-        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val zoneId = BiddingZones.resolve(countryCode).zoneId
         val today = LocalDate.now(clock.withZone(zoneId))
         val yesterday = today.minusDays(1)
         val tomorrow = today.plusDays(1)

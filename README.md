@@ -14,6 +14,9 @@
 - raw monitor status: http://localhost:8080/monitor
 - prices (EE): http://localhost:8080/api/prices
 - price summary: http://localhost:8080/api/prices/EE/stats/summary
+
+Region identifiers must match the canonical code exactly, for example `EE`, `FI`, `NO1`,
+`DE_LU`, or `GB`. Lowercase codes, aliases, and provider EIC identifiers return HTTP 400.
 ---
 
 ## Big picture

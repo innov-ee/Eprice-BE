@@ -85,7 +85,7 @@ class ProviderRoutingRegressionTest {
     }
 
     @Test
-    fun `repository returns and caches only requested intervals across region aliases`() = runBlocking {
+    fun `repository returns and caches only requested intervals`() = runBlocking {
         var calls = 0
         val engine = MockEngine {
             calls++
@@ -104,12 +104,11 @@ class ProviderRoutingRegressionTest {
         try {
             val mapper = XmlMapper().apply { registerKotlinModule(); configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false) }
             val repo = EnergyPriceRepositoryImpl(EntsoeService(client, mapper, "test-token"), EleringService(client), cache)
-            val prices = repo.getPrices("DE", start, end, true).getOrThrow()
+            val prices = repo.getPrices("DE_LU", start, end, true).getOrThrow()
             assertEquals(4, prices.size)
             assertEquals(start, prices.first().startTime)
             assertEquals(start.plusSeconds(2700), prices.last().startTime)
             assertEquals(prices, repo.getPrices("DE_LU", start, end, true).getOrThrow())
-            assertEquals(prices, repo.getPrices("10Y1001A1001A82H", start, end, true).getOrThrow())
             assertEquals(1, calls)
             assertEquals(listOf(prices), entries.values.toList())
         } finally { client.close() }
@@ -191,7 +190,7 @@ class ProviderRoutingRegressionTest {
             )
         }
         withRepository(engine) { repo ->
-            assertTrue(repo.getPrices("DE", start, end, false).getOrThrow().isEmpty())
+            assertTrue(repo.getPrices("DE_LU", start, end, false).getOrThrow().isEmpty())
         }
     }
 
@@ -201,7 +200,7 @@ class ProviderRoutingRegressionTest {
             respond("Rate limit exceeded", HttpStatusCode.TooManyRequests)
         }
         withRepository(engine) { repo ->
-            val error = repo.getPrices("DE", start, end, false).exceptionOrNull()
+            val error = repo.getPrices("DE_LU", start, end, false).exceptionOrNull()
             assertTrue(error is ApiError.Server)
             assertEquals(429, error.code)
         }

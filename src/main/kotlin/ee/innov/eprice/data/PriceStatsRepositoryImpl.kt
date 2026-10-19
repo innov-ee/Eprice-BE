@@ -1,6 +1,6 @@
 package ee.innov.eprice.data
 
-import ee.innov.eprice.domain.CountryZoneProvider
+import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.domain.model.DailyStatEntry
@@ -21,7 +21,7 @@ class PriceStatsRepositoryImpl(
         startDate: LocalDate,
         endDate: LocalDate
     ): Result<Map<LocalDate, DailyStatEntry>> {
-        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val zoneId = BiddingZones.resolve(countryCode).zoneId
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
         val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
 
@@ -52,7 +52,7 @@ class PriceStatsRepositoryImpl(
     }
 
     private suspend fun fetchDailyStat(countryCode: String, date: LocalDate): Pair<LocalDate, DailyStatEntry>? {
-        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val zoneId = BiddingZones.resolve(countryCode).zoneId
         val dayStart = date.atStartOfDay(zoneId).toInstant()
         val dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant()
 

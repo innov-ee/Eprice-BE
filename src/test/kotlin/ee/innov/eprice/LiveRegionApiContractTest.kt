@@ -84,7 +84,7 @@ class LiveRegionApiContractTest {
     fun `all live regions preserve array shape UTC string timestamps and five decimal EUR prices`() = withApi { client ->
         val formatted = mapOf("EE" to "0.10000", "FI" to "-0.05000", "LT" to "0.00000", "LV" to "0.20000")
         formatted.forEach { (code, price) ->
-            val response = client.get("/api/prices/${code.lowercase()}")
+            val response = client.get("/api/prices/$code")
             assertEquals(HttpStatusCode.OK, response.status)
             val rows = Json.parseToJsonElement(response.bodyAsText()).jsonArray
             assertEquals(292, rows.size) // yesterday 24h + today 25h + tomorrow 24h
@@ -149,8 +149,8 @@ class LiveRegionApiContractTest {
     }
 
     @Test
-    fun `unknown and ambiguous regions return 400 before contacting a provider`() = withApi { client ->
-        listOf("UNKNOWN", "NO", "SE", "IT", "10X1001A1001A82H").forEach { code ->
+    fun `noncanonical unknown and ambiguous regions return 400 before contacting a provider`() = withApi { client ->
+        listOf("ee", "Ee", "%20EE%20", "DE", "LU", "UK", "DE-LU", "NO-1", "se_3", "IT-NORD", "10YFI-1--------U", "UNKNOWN", "NO", "SE", "IT").forEach { code ->
             listOf("", "/stats/summary").forEach { suffix ->
                 assertEquals(HttpStatusCode.BadRequest, client.get("/api/prices/$code$suffix").status)
             }
@@ -160,7 +160,7 @@ class LiveRegionApiContractTest {
     @Test
     fun `live summary retains fields types and local dates on the DST day`() = withApi { client ->
         amounts.forEach { (code, amount) ->
-            val response = client.get("/api/prices/${code.lowercase()}/stats/summary")
+            val response = client.get("/api/prices/$code/stats/summary")
             assertEquals(HttpStatusCode.OK, response.status)
             val fields = Json.parseToJsonElement(response.bodyAsText()).jsonObject.getValue("today").jsonObject
             assertStatistics(fields, code, amount / 1000)

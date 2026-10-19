@@ -5,7 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
-import ee.innov.eprice.domain.CountryZoneProvider
+import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.monitoring.ServiceMonitor
 import io.ktor.client.HttpClient
@@ -69,7 +69,7 @@ class EnergyPriceRepositoryImplTest {
     @Test
     fun `getPrices caches complete dataset indefinitely`() = runBlocking<Unit> {
         val networkCallCount = AtomicInteger(0)
-        val zoneId = CountryZoneProvider.getZoneId("EE")
+        val zoneId = BiddingZones.resolve("EE").zoneId
         val d1 = LocalDate.of(2026, 8, 22)
         val d2 = LocalDate.of(2026, 8, 23)
         val d3 = LocalDate.of(2026, 8, 24)
@@ -132,7 +132,7 @@ class EnergyPriceRepositoryImplTest {
     @Test
     fun `getPrices caches incomplete dataset with temporary TTL to throttle upstream requests`() = runBlocking<Unit> {
         val networkCallCount = AtomicInteger(0)
-        val zoneId = CountryZoneProvider.getZoneId("EE")
+        val zoneId = BiddingZones.resolve("EE").zoneId
         val d1 = LocalDate.of(2026, 8, 22)
         val d2 = LocalDate.of(2026, 8, 23)
         val d3 = LocalDate.of(2026, 8, 24)
@@ -204,7 +204,7 @@ class EnergyPriceRepositoryImplTest {
     @Test
     fun `getPrices for non-Baltic country queries ENTSO-E directly bypassing Elering`() = runBlocking<Unit> {
         val requestedUrls = mutableListOf<String>()
-        val zoneId = CountryZoneProvider.getZoneId("DE")
+        val zoneId = BiddingZones.resolve("DE_LU").zoneId
         val d1 = LocalDate.of(2026, 8, 22)
         val start = d1.atStartOfDay(zoneId).toInstant()
         val end = d1.plusDays(1).atStartOfDay(zoneId).toInstant()
@@ -249,7 +249,7 @@ class EnergyPriceRepositoryImplTest {
             cache = inMemoryCache
         )
 
-        val result = repository.getPrices("DE", start, end, cacheResults = true)
+        val result = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result.isSuccess)
         assertEquals(24, result.getOrThrow().size)
 
@@ -262,7 +262,7 @@ class EnergyPriceRepositoryImplTest {
     @Test
     fun `getPrices caches data and reuses cache across subsequent calls`() = runBlocking<Unit> {
         var networkCallCount = 0
-        val zoneId = CountryZoneProvider.getZoneId("DE")
+        val zoneId = BiddingZones.resolve("DE_LU").zoneId
         val d1 = LocalDate.of(2026, 8, 22)
         val start = d1.atStartOfDay(zoneId).toInstant()
         val end = d1.plusDays(1).atStartOfDay(zoneId).toInstant()
@@ -307,13 +307,13 @@ class EnergyPriceRepositoryImplTest {
             cache = inMemoryCache
         )
 
-        // First call with "DE"
-        val result1 = repository.getPrices("DE", start, end, cacheResults = true)
+        // First call with "DE_LU"
+        val result1 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result1.isSuccess)
         assertEquals(1, networkCallCount)
 
-        // Second call with "DE" should hit cache
-        val result2 = repository.getPrices("DE", start, end, cacheResults = true)
+        // Second call with "DE_LU" should hit cache
+        val result2 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result2.isSuccess)
         assertEquals(1, networkCallCount)
 

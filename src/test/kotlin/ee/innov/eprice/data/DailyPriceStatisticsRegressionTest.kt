@@ -25,7 +25,7 @@ class DailyPriceStatisticsRegressionTest {
         // Two ordinary 24-hour days: one hourly at 0.10, one quarter hourly at 0.30.
         // Sample weighting gives 0.26; the average over elapsed time is 0.20.
         val stats = PriceStatistics.compute(
-            "DE", date, date.plusDays(1), 2,
+            "DE_LU", date, date.plusDays(1), 2,
             listOf(
                 DailyStatEntry(0.1, 0.1, 0.1, 2.4, 24),
                 DailyStatEntry(0.3, 0.3, 0.3, 28.8, 96, durationSeconds = 86400)
@@ -46,13 +46,13 @@ class DailyPriceStatisticsRegressionTest {
     fun `daily statistics and cache contain only the requested local day`() = runBlocking {
         val cache = InMemoryDailyStatsCache()
         val repo = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(oversizedResponse())), cache)
-        val stats = repo.getDailyStats("DE", date, date).getOrThrow().getValue(date)
+        val stats = repo.getDailyStats("DE_LU", date, date).getOrThrow().getValue(date)
         assertEquals(0.1, stats.min, 1e-12)
         assertEquals(0.1, stats.max, 1e-12)
         assertEquals(0.1, stats.avg, 1e-12)
         assertEquals(9.6, stats.sum, 1e-12)
         assertEquals(96, stats.count)
-        assertEquals(stats, cache.get("DE", date))
+        assertEquals(stats, cache.get("DE_LU", date))
     }
 
     @Test
@@ -60,7 +60,7 @@ class DailyPriceStatisticsRegressionTest {
         val cause = IllegalStateException("Provider unavailable")
         listOf(ApiError.Server(503, "Provider unavailable", cause), ApiError.Timeout("Timed out", cause)).forEach { error ->
             val prices = FixedPriceRepository(Result.failure(error))
-            val stats = PriceStatsRepositoryImpl(prices, InMemoryDailyStatsCache()).getDailyStats("DE", date, date)
+            val stats = PriceStatsRepositoryImpl(prices, InMemoryDailyStatsCache()).getDailyStats("DE_LU", date, date)
             assertSame(error, stats.exceptionOrNull())
         }
     }
@@ -70,7 +70,7 @@ class DailyPriceStatisticsRegressionTest {
         val failure = IllegalStateException("Provider unavailable")
         val cache = InMemoryDailyStatsCache()
         val repo = PriceStatsRepositoryImpl(FixedPriceRepository(Result.failure(failure)), cache)
-        val result = repo.getDailyStats("DE", date, date)
+        val result = repo.getDailyStats("DE_LU", date, date)
         assertTrue(result.isFailure, "A provider failure must not become successful missing data")
         assertSame(failure, result.exceptionOrNull())
         assertTrue(cache.store.isEmpty())
@@ -80,7 +80,7 @@ class DailyPriceStatisticsRegressionTest {
     fun `unpublished prices remain missing data and are not cached`() = runBlocking {
         val prices = FixedPriceRepository(Result.success(emptyList()))
         val statsCache = InMemoryDailyStatsCache()
-        assertTrue(PriceStatsRepositoryImpl(prices, statsCache).getDailyStats("DE", date, date).getOrThrow().isEmpty())
+        assertTrue(PriceStatsRepositoryImpl(prices, statsCache).getDailyStats("DE_LU", date, date).getOrThrow().isEmpty())
         assertTrue(statsCache.store.isEmpty())
     }
 
@@ -90,7 +90,7 @@ class DailyPriceStatisticsRegressionTest {
         val prices = (0 until 12).map { DomainEnergyPrice(start.plusSeconds(it * 3600L), 0.1, 3600) } +
             (0 until 48).map { DomainEnergyPrice(start.plusSeconds(43200 + it * 900L), 0.3, 900) }
         val repo = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(prices)), InMemoryDailyStatsCache())
-        val stats = repo.getDailyStats("DE", date, date).getOrThrow().getValue(date)
+        val stats = repo.getDailyStats("DE_LU", date, date).getOrThrow().getValue(date)
         assertEquals(60, stats.count)
         assertEquals(86400L, stats.durationSeconds)
         assertEquals(0.2, stats.avg, 1e-12)
@@ -105,14 +105,14 @@ class DailyPriceStatisticsRegressionTest {
         val priceRepo = FixedPriceRepository(Result.success(prices))
         val cache = InMemoryDailyStatsCache()
         val daily = PriceStatsRepositoryImpl(priceRepo, cache)
-            .getDailyStats("DE", previous, dstDate).getOrThrow()
-        val statistics = PriceStatistics.compute("DE", daily, previous, dstDate, 2)!!
+            .getDailyStats("DE_LU", previous, dstDate).getOrThrow()
+        val statistics = PriceStatistics.compute("DE_LU", daily, previous, dstDate, 2)!!
         val expected = (24 * 0.1 + 25 * 0.3) / 49
         assertEquals(expected, statistics.averagePrice, 1e-12)
         val cached = PriceStatsRepositoryImpl(
             FixedPriceRepository(Result.failure(IllegalStateException("Should not fetch cached days"))), cache
-        ).getDailyStats("DE", previous, dstDate).getOrThrow()
-        assertEquals(expected, PriceStatistics.compute("DE", cached, previous, dstDate, 2)!!.averagePrice, 1e-12)
+        ).getDailyStats("DE_LU", previous, dstDate).getOrThrow()
+        assertEquals(expected, PriceStatistics.compute("DE_LU", cached, previous, dstDate, 2)!!.averagePrice, 1e-12)
     }
 
     @Test
@@ -121,10 +121,10 @@ class DailyPriceStatisticsRegressionTest {
             val prices = dayPrices(day, zone, price = -0.05)
             val cache = InMemoryDailyStatsCache()
             val repo = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(prices)), cache)
-            val stats = repo.getDailyStats("DE", day, day).getOrThrow().getValue(day)
+            val stats = repo.getDailyStats("DE_LU", day, day).getOrThrow().getValue(day)
             assertEquals(count, stats.count)
             assertEquals(-0.05, stats.avg, 1e-12)
-            assertEquals(stats, cache.get("DE", day))
+            assertEquals(stats, cache.get("DE_LU", day))
         }
     }
 }

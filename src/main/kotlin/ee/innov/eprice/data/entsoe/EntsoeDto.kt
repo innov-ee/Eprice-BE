@@ -138,7 +138,3 @@ private fun List<DomainEnergyPrice>.mergeIdenticalIntervals(): List<DomainEnergy
         checkPriceData(duplicates.distinct().size == 1, "Conflicting price series for the same UTC interval")
         duplicates.first()
     }
-
-/** Resolves known area identifiers through the shared timezone/EIC registry. */
-internal fun String.toBiddingZone(): String? =
-    runCatching { ee.innov.eprice.domain.BiddingZones.resolve(this).eic }.getOrNull()
