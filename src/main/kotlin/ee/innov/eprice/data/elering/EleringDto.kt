@@ -34,23 +34,45 @@ data class EleringPriceData(
 fun EleringPriceResponse.toDomainEnergyPrices(countryCode: String): List<DomainEnergyPrice> {
     if (!this.success) return emptyList()
 
-    val prices = (this.data[countryCode] ?: return emptyList()).sortedBy { it.timestamp }
-    if (prices.any { !it.price.isFinite() } || prices.map { it.timestamp }.distinct().size != prices.size) {
-        throw InvalidPriceDataException("Elering returned non-finite prices or duplicate timestamps")
-    }
-    // Nord Pool's 2025 delivery transition, verified against Elering for EE/FI/LV/LT.
-    // It happens at 01:00 locally, so choosing a resolution by local date is incorrect.
-    val quarterHourlyStart = Instant.parse("2025-09-30T22:00:00Z")
+    val prices = (this.data[countryCode] ?: return emptyList()).sortedChronologically()
+    prices.validateFinitePrices()
+    prices.validateUniqueTimestamps()
 
-    return prices.map {
-        val start = Instant.ofEpochSecond(it.timestamp)
-        val step = if (start < quarterHourlyStart) 3600L else 900L
-        if (it.timestamp % step != 0L) throw InvalidPriceDataException("Elering price timestamp is not aligned to its interval")
+    return prices.map { price ->
+        val start = Instant.ofEpochSecond(price.timestamp)
+        val durationSeconds = intervalDurationSeconds(start)
+        price.validateIntervalAlignment(durationSeconds)
         DomainEnergyPrice(
             startTime = start,
             // Convert MWh price to KWh price
-            pricePerKWh = it.price / 1000.0,
-            durationSeconds = step
+            pricePerKWh = price.price / 1000.0,
+            durationSeconds = durationSeconds
         )
+    }
+}
+
+private fun List<EleringPriceData>.sortedChronologically(): List<EleringPriceData> = sortedBy { it.timestamp }
+
+private fun List<EleringPriceData>.validateFinitePrices() {
+    if (any { !it.price.isFinite() }) {
+        throw InvalidPriceDataException("Elering returned non-finite prices")
+    }
+}
+
+private fun List<EleringPriceData>.validateUniqueTimestamps() {
+    if (map { it.timestamp }.distinct().size != size) {
+        throw InvalidPriceDataException("Elering returned duplicate timestamps")
+    }
+}
+
+// Nord Pool's 2025 delivery transition, verified against Elering for EE/FI/LV/LT.
+// It happens at 01:00 locally, so choosing a resolution by local date is incorrect.
+private val quarterHourlyStart = Instant.parse("2025-09-30T22:00:00Z")
+
+private fun intervalDurationSeconds(start: Instant): Long = if (start < quarterHourlyStart) 3600L else 900L
+
+private fun EleringPriceData.validateIntervalAlignment(durationSeconds: Long) {
+    if (timestamp % durationSeconds != 0L) {
+        throw InvalidPriceDataException("Elering price timestamp is not aligned to its interval")
     }
 }

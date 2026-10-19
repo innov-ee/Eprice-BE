@@ -60,45 +60,84 @@ private fun parseResolutionSeconds(resolution: String): Long {
 }
 
 fun PublicationMarketDocument.toDomainEnergyPrices(): List<DomainEnergyPrice> {
-    val prices = timeSeries.flatMap { series ->
-        checkPriceData(series.currency == "EUR", "Expected EUR prices, received ${series.currency ?: "no currency"}")
-        checkPriceData(series.priceUnit == "MWH", "Expected MWH price unit, received ${series.priceUnit ?: "no unit"}")
-        val curve = series.curveType ?: "A01"
-        checkPriceData(curve == "A01" || curve == "A03", "Unsupported price curve: $curve")
-        series.period.flatMap periodLoop@ { period ->
-            val step = parseResolutionSeconds(period.resolution)
-            val start = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.start))
-            val points = period.point.sortedBy { it.position }
-            if (points.isEmpty()) return@periodLoop emptyList<DomainEnergyPrice>()
-            val end = period.timeInterval.end?.let { Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(it)) }
-                ?: start.plusSeconds(points.last().position * step)
-            val seconds = Duration.between(start, end).seconds
-            checkPriceData(seconds > 0 && seconds % step == 0L, "Price period does not match its resolution")
-            val count = seconds / step
-            checkPriceData(points.all { it.position in 1..count }, "Price point lies outside its period")
-            checkPriceData(points.all { it.priceAmount == null || it.priceAmount.isFinite() }, "Price must be finite")
-            val pointMap = points.groupBy { it.position }.mapValues { (_, duplicates) ->
-                checkPriceData(duplicates.map { it.priceAmount }.distinct().size == 1, "Conflicting prices for the same position")
-                duplicates.first()
-            }
-            if (curve == "A01") {
-                pointMap.values.mapNotNull { point ->
-                    point.priceAmount?.let { DomainEnergyPrice(start.plusSeconds((point.position - 1) * step), it / 1000, step) }
-                }
-            } else {
-                var amount: Double? = null
-                (1..count).mapNotNull { position ->
-                    pointMap[position.toInt()]?.let { amount = it.priceAmount }
-                    amount?.let { DomainEnergyPrice(start.plusSeconds((position - 1) * step), it / 1000, step) }
-                }
-            }
-        }
+    return timeSeries.flatMap { series ->
+        series.validateCurrencyAndUnit()
+        val curve = series.validatedCurveType()
+        series.period.flatMap { it.toDomainEnergyPrices(curve) }
+    }.mergeIdenticalIntervals().sortedBy { it.startTime }
+}
+
+private fun TimeSeries.validateCurrencyAndUnit() {
+    checkPriceData(currency == "EUR", "Expected EUR prices, received ${currency ?: "no currency"}")
+    checkPriceData(priceUnit == "MWH", "Expected MWH price unit, received ${priceUnit ?: "no unit"}")
+}
+
+private fun TimeSeries.validatedCurveType(): String {
+    val curve = curveType ?: "A01"
+    checkPriceData(curve == "A01" || curve == "A03", "Unsupported price curve: $curve")
+    return curve
+}
+
+private fun Period.toDomainEnergyPrices(curve: String): List<DomainEnergyPrice> {
+    val step = parseResolutionSeconds(resolution)
+    val start = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(timeInterval.start))
+    val points = point.sortedBy { it.position }
+    if (points.isEmpty()) return emptyList()
+
+    val end = timeInterval.end?.let { Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(it)) }
+        ?: start.plusSeconds(points.last().position * step)
+    val count = validatedIntervalCount(start, end, step)
+    points.validatePositions(count)
+    points.validateFinitePrices()
+    val pointMap = points.mergeIdenticalPositions()
+
+    return if (curve == "A01") {
+        pointMap.values.mapExplicitPrices(start, step)
+    } else {
+        pointMap.expandSteppedPrices(start, step, count)
     }
-    return prices.groupBy { it.startTime }.map { (_, duplicates) ->
+}
+
+private fun validatedIntervalCount(start: Instant, end: Instant, step: Long): Long {
+    val seconds = Duration.between(start, end).seconds
+    checkPriceData(seconds > 0 && seconds % step == 0L, "Price period does not match its resolution")
+    return seconds / step
+}
+
+private fun List<Point>.validatePositions(count: Long) {
+    checkPriceData(all { it.position in 1..count }, "Price point lies outside its period")
+}
+
+private fun List<Point>.validateFinitePrices() {
+    checkPriceData(all { it.priceAmount == null || it.priceAmount.isFinite() }, "Price must be finite")
+}
+
+private fun List<Point>.mergeIdenticalPositions(): Map<Int, Point> =
+    groupBy { it.position }.mapValues { (_, duplicates) ->
+        checkPriceData(duplicates.map { it.priceAmount }.distinct().size == 1, "Conflicting prices for the same position")
+        duplicates.first()
+    }
+
+/** A01 supplies individual prices; missing positions remain gaps. */
+private fun Collection<Point>.mapExplicitPrices(start: Instant, step: Long): List<DomainEnergyPrice> =
+    mapNotNull { point ->
+        point.priceAmount?.let { DomainEnergyPrice(start.plusSeconds((point.position - 1) * step), it / 1000, step) }
+    }
+
+/** A03 prices carry forward until the next point; a null price clears the current value. */
+private fun Map<Int, Point>.expandSteppedPrices(start: Instant, step: Long, count: Long): List<DomainEnergyPrice> {
+    var amount: Double? = null
+    return (1..count).mapNotNull { position ->
+        this[position.toInt()]?.let { amount = it.priceAmount }
+        amount?.let { DomainEnergyPrice(start.plusSeconds((position - 1) * step), it / 1000, step) }
+    }
+}
+
+private fun List<DomainEnergyPrice>.mergeIdenticalIntervals(): List<DomainEnergyPrice> =
+    groupBy { it.startTime }.map { (_, duplicates) ->
         checkPriceData(duplicates.distinct().size == 1, "Conflicting price series for the same UTC interval")
         duplicates.first()
-    }.sortedBy { it.startTime }
-}
+    }
 
 /** Resolves known area identifiers through the shared timezone/EIC registry. */
 internal fun String.toBiddingZone(): String? =
