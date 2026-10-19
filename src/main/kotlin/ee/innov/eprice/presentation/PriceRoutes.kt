@@ -22,6 +22,7 @@ import io.ktor.server.application.log
 import io.ktor.server.auth.AuthenticationStrategy
 import io.ktor.server.auth.authenticate
 import io.ktor.server.http.content.staticResources
+import io.ktor.server.request.path
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -118,7 +119,6 @@ fun Route.priceRoutes() {
                 call.respond(HttpStatusCode.OK, responseData)
 
             }.onFailure { error ->
-                call.application.log.error("Error fetching prices for $countryCode", error)
                 respondWithError(call, error)
             }
         }
@@ -131,7 +131,6 @@ fun Route.priceRoutes() {
             result.onSuccess { summary ->
                 call.respond(HttpStatusCode.OK, summary)
             }.onFailure { error ->
-                call.application.log.error("Error fetching price stats summary for $countryCode", error)
                 respondWithError(call, error)
             }
         }
@@ -145,7 +144,7 @@ private suspend fun respondWithError(
     call: ApplicationCall,
     error: Throwable
 ) {
-    call.application.log.error("API Error", error) // Log all errors
+    call.application.log.error("API error for ${call.request.path()}", error)
     when (error) {
         is ApiError.Timeout -> call.respond(
             HttpStatusCode.GatewayTimeout,
