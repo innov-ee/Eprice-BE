@@ -5,7 +5,6 @@ import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.isFullDay
-import ee.innov.eprice.domain.model.inRange
 import ee.innov.eprice.monitoring.ServiceMonitor
 import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
@@ -62,7 +61,7 @@ class PriceStatsRepositoryImpl(
             start = dayStart,
             end = dayEnd,
             cacheResults = false
-        ).getOrThrow().inRange(dayStart, dayEnd)
+        ).getOrThrow()
         if (prices.isEmpty()) return null
 
         if (!prices.isFullDay(date, zoneId)) {

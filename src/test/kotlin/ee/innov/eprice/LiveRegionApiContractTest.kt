@@ -1,18 +1,14 @@
 package ee.innov.eprice
 
-import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.di.appModule
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
-import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
-import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.test.FixedPriceRepository
 import ee.innov.eprice.security.KeyRotationService
-import ee.innov.eprice.test.NoOpDailyAveragePriceCache
 import ee.innov.eprice.test.NoOpDailyStatsCache
 import ee.innov.eprice.test.NoOpPriceCache
 import io.ktor.client.HttpClient
@@ -73,12 +69,9 @@ class LiveRegionApiContractTest {
             single(named("entsoeApiKey")) { "test-token" }
             single<PriceCache> { NoOpPriceCache() }
             single<DailyStatsCache> { NoOpDailyStatsCache() }
-            single<DailyAveragePriceCache> { NoOpDailyAveragePriceCache() }
             if (failure != null) single<EnergyPriceRepository> { FixedPriceRepository(Result.failure(failure)) }
             factory { GetEnergyPricesUseCase(get(), clock) }
-            factory { GetPriceStatisticsUseCase(get(), clock) }
             factory { GetPriceSummaryUseCase(get(), clock) }
-            factory { GetRollingAveragePriceUseCase(get(), get(), clock) }
         }
         application { module(koinModules = listOf(appModule, overrides), allowKoinOverrides = true) }
         val authenticated = createClient {
@@ -121,11 +114,26 @@ class LiveRegionApiContractTest {
     }
 
     @Test
+    fun `retired price endpoints return 404 and are absent from the catalogue`() = withApi { client ->
+        listOf("/api/prices/EE/avg", "/api/prices/EE/stats", "/api/prices/EE/stats?range=today").forEach { path ->
+            assertEquals(HttpStatusCode.NotFound, client.get(path).status)
+        }
+        val response = client.get("/api/meta/routes")
+        assertEquals(HttpStatusCode.OK, response.status)
+        val paths = Json.parseToJsonElement(response.bodyAsText()).jsonArray.map {
+            it.jsonObject.getValue("path").jsonPrimitive.content
+        }
+        assertFalse("/api/prices/{countryCode}/avg" in paths)
+        assertFalse("/api/prices/{countryCode}/stats" in paths)
+        assertTrue("/api/prices/{countryCode}/stats/summary" in paths)
+    }
+
+    @Test
     fun `provider failures retain 502 responses through price and statistics routes`() = withApi(
         failure = ApiError.Server(503, "Provider unavailable", IllegalStateException("Provider unavailable"))
     ) { client ->
         amounts.keys.forEach { code ->
-            listOf("", "/avg", "/stats?range=today", "/stats/summary").forEach { suffix ->
+            listOf("", "/stats/summary").forEach { suffix ->
                 assertEquals(HttpStatusCode.BadGateway, client.get("/api/prices/$code$suffix").status)
             }
         }
@@ -135,7 +143,7 @@ class LiveRegionApiContractTest {
     fun `provider timeouts retain 504 responses through price and statistics routes`() = withApi(
         failure = ApiError.Timeout("Timed out", IllegalStateException("Timed out"))
     ) { client ->
-        listOf("", "/avg", "/stats?range=today", "/stats/summary").forEach { suffix ->
+        listOf("", "/stats/summary").forEach { suffix ->
             assertEquals(HttpStatusCode.GatewayTimeout, client.get("/api/prices/EE$suffix").status)
         }
     }
@@ -143,39 +151,22 @@ class LiveRegionApiContractTest {
     @Test
     fun `unknown and ambiguous regions return 400 before contacting a provider`() = withApi { client ->
         listOf("UNKNOWN", "NO", "SE", "IT", "10X1001A1001A82H").forEach { code ->
-            listOf("", "/avg", "/stats", "/stats/summary").forEach { suffix ->
+            listOf("", "/stats/summary").forEach { suffix ->
                 assertEquals(HttpStatusCode.BadRequest, client.get("/api/prices/$code$suffix").status)
             }
         }
     }
 
     @Test
-    fun `live statistics retain fields types and local dates on the DST day`() = withApi { client ->
+    fun `live summary retains fields types and local dates on the DST day`() = withApi { client ->
         amounts.forEach { (code, amount) ->
-            val response = client.get("/api/prices/${code.lowercase()}/stats?range=today")
+            val response = client.get("/api/prices/${code.lowercase()}/stats/summary")
             assertEquals(HttpStatusCode.OK, response.status)
-            val fields = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val fields = Json.parseToJsonElement(response.bodyAsText()).jsonObject.getValue("today").jsonObject
             assertStatistics(fields, code, amount / 1000)
             assertEquals("2026-10-25", fields.getValue("startDate").jsonPrimitive.content)
             assertEquals("2026-10-25", fields.getValue("endDate").jsonPrimitive.content)
             assertEquals(1, fields.getValue("daysCalculated").jsonPrimitive.int)
-        }
-    }
-
-    @Test
-    fun `live rolling average retains five day window and response types`() = withApi { client ->
-        amounts.forEach { (code, amount) ->
-            val response = client.get("/api/prices/$code/avg")
-            assertEquals(HttpStatusCode.OK, response.status)
-            val fields = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals(setOf("countryCode", "daysRequested", "daysCalculated", "startDate", "endDate", "averagePrice"), fields.keys)
-            assertEquals(code, fields.getValue("countryCode").jsonPrimitive.content)
-            assertEquals(5, fields.getValue("daysRequested").jsonPrimitive.int)
-            assertEquals(5, fields.getValue("daysCalculated").jsonPrimitive.int)
-            assertEquals("2026-10-20", fields.getValue("startDate").jsonPrimitive.content)
-            assertEquals("2026-10-24", fields.getValue("endDate").jsonPrimitive.content)
-            assertFalse(fields.getValue("averagePrice").jsonPrimitive.isString)
-            assertEquals(amount / 1000, fields.getValue("averagePrice").jsonPrimitive.double, 1e-12)
         }
     }
 

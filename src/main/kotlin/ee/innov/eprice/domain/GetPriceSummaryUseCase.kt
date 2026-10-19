@@ -1,6 +1,6 @@
 package ee.innov.eprice.domain
 
-import ee.innov.eprice.domain.GetPriceStatisticsUseCase.PriceStatistics
+import ee.innov.eprice.domain.model.PriceStatistics
 import ee.innov.eprice.domain.model.NoDataFoundException
 import kotlinx.serialization.Serializable
 import java.time.Clock

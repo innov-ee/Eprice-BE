@@ -1,22 +1,17 @@
 package ee.innov.eprice.data
 
-import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
-import ee.innov.eprice.domain.GetPriceStatisticsUseCase.PriceStatistics
+import ee.innov.eprice.domain.model.PriceStatistics
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.DomainEnergyPrice
-import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.test.FixedPriceRepository
-import ee.innov.eprice.test.InMemoryDailyAveragePriceCache
 import ee.innov.eprice.test.InMemoryDailyStatsCache
 import ee.innov.eprice.test.dayPrices
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -24,7 +19,6 @@ import kotlin.test.assertTrue
 class DailyPriceStatisticsRegressionTest {
     private val date = LocalDate.of(2026, 8, 22)
     private val zone = ZoneId.of("Europe/Berlin")
-    private val clock = Clock.fixed(Instant.parse("2026-08-23T12:00:00Z"), ZoneOffset.UTC)
 
     @Test
     fun `equal duration days have equal weight across an hourly to quarter hourly transition`() {
@@ -62,24 +56,12 @@ class DailyPriceStatisticsRegressionTest {
     }
 
     @Test
-    fun `rolling average and cache exclude prices outside the requested local day`() = runBlocking {
-        val cache = InMemoryDailyAveragePriceCache()
-        val useCase = GetRollingAveragePriceUseCase(FixedPriceRepository(Result.success(oversizedResponse())), cache, clock)
-        val average = useCase.execute("DE", 1).getOrThrow()
-        assertEquals(0.1, average.averagePrice, 1e-12)
-        assertEquals(1, average.daysCalculated)
-        assertEquals(0.1, cache.get("DE", date)!!, 1e-12)
-    }
-
-    @Test
-    fun `typed provider errors remain failed Results in both statistics paths`() = runBlocking {
+    fun `typed provider errors remain failed Results in daily statistics`() = runBlocking {
         val cause = IllegalStateException("Provider unavailable")
         listOf(ApiError.Server(503, "Provider unavailable", cause), ApiError.Timeout("Timed out", cause)).forEach { error ->
             val prices = FixedPriceRepository(Result.failure(error))
             val stats = PriceStatsRepositoryImpl(prices, InMemoryDailyStatsCache()).getDailyStats("DE", date, date)
-            val average = GetRollingAveragePriceUseCase(prices, InMemoryDailyAveragePriceCache(), clock).execute("DE", 1)
             assertSame(error, stats.exceptionOrNull())
-            assertSame(error, average.exceptionOrNull())
         }
     }
 
@@ -95,24 +77,11 @@ class DailyPriceStatisticsRegressionTest {
     }
 
     @Test
-    fun `rolling average preserves provider failure rather than reporting no data`() = runBlocking {
-        val failure = IllegalStateException("Provider unavailable")
-        val cache = InMemoryDailyAveragePriceCache()
-        val useCase = GetRollingAveragePriceUseCase(FixedPriceRepository(Result.failure(failure)), cache, clock)
-        val result = useCase.execute("DE", 1)
-        assertSame(failure, result.exceptionOrNull())
-        assertTrue(cache.store.isEmpty())
-    }
-
-    @Test
     fun `unpublished prices remain missing data and are not cached`() = runBlocking {
         val prices = FixedPriceRepository(Result.success(emptyList()))
         val statsCache = InMemoryDailyStatsCache()
         assertTrue(PriceStatsRepositoryImpl(prices, statsCache).getDailyStats("DE", date, date).getOrThrow().isEmpty())
-        val averageCache = InMemoryDailyAveragePriceCache()
-        assertTrue(GetRollingAveragePriceUseCase(prices, averageCache, clock).execute("DE", 1).exceptionOrNull() is NoDataFoundException)
         assertTrue(statsCache.store.isEmpty())
-        assertTrue(averageCache.store.isEmpty())
     }
 
     @Test
@@ -128,25 +97,22 @@ class DailyPriceStatisticsRegressionTest {
     }
 
     @Test
-    fun `rolling and statistics averages give a 25 hour day its actual elapsed weight`() = runBlocking {
+    fun `statistics averages give a 25 hour day its actual elapsed weight and reuse cached days`() = runBlocking {
         val dstDate = LocalDate.of(2026, 10, 25)
         val previous = dstDate.minusDays(1)
         val prices = dayPrices(previous, zone, stepSeconds = 3600, price = 0.1) +
             dayPrices(dstDate, zone, price = 0.3)
         val priceRepo = FixedPriceRepository(Result.success(prices))
-        val daily = PriceStatsRepositoryImpl(priceRepo, InMemoryDailyStatsCache())
+        val cache = InMemoryDailyStatsCache()
+        val daily = PriceStatsRepositoryImpl(priceRepo, cache)
             .getDailyStats("DE", previous, dstDate).getOrThrow()
         val statistics = PriceStatistics.compute("DE", daily, previous, dstDate, 2)!!
-        val avgCache = InMemoryDailyAveragePriceCache()
-        val dstClock = Clock.fixed(Instant.parse("2026-10-26T12:00:00Z"), ZoneOffset.UTC)
-        val rolling = GetRollingAveragePriceUseCase(priceRepo, avgCache, dstClock).execute("DE", 2).getOrThrow()
         val expected = (24 * 0.1 + 25 * 0.3) / 49
         assertEquals(expected, statistics.averagePrice, 1e-12)
-        assertEquals(expected, rolling.averagePrice, 1e-12)
-        val cached = GetRollingAveragePriceUseCase(
-            FixedPriceRepository(Result.failure(IllegalStateException("Should not fetch cached days"))), avgCache, dstClock
-        ).execute("DE", 2).getOrThrow()
-        assertEquals(expected, cached.averagePrice, 1e-12)
+        val cached = PriceStatsRepositoryImpl(
+            FixedPriceRepository(Result.failure(IllegalStateException("Should not fetch cached days"))), cache
+        ).getDailyStats("DE", previous, dstDate).getOrThrow()
+        assertEquals(expected, PriceStatistics.compute("DE", cached, previous, dstDate, 2)!!.averagePrice, 1e-12)
     }
 
     @Test

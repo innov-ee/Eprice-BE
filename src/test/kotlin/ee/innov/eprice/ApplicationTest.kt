@@ -1,15 +1,11 @@
 package ee.innov.eprice
 
-import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.di.appModule
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
-import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
-import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.security.KeyRotationService
-import ee.innov.eprice.test.NoOpDailyAveragePriceCache
 import ee.innov.eprice.test.NoOpDailyStatsCache
 import ee.innov.eprice.test.NoOpPriceCache
 import io.ktor.client.HttpClient
@@ -209,121 +205,6 @@ class ApplicationTest {
                 val body = response.bodyAsText()
                 assertTrue(body.contains(""""error":"Server error (code 200)""""))
                 assertTrue(body.contains("Unexpected non-XML response from ENTSO-E"))
-            }
-        )
-    }
-
-    @Test
-    fun `GET prices stats should return 200 OK with aggregated statistics`() {
-        runPriceApiTest(
-            engineHandler = createMockEngineHandler(
-                eleringContent = mockEleringSuccessJson,
-                eleringStatus = HttpStatusCode.OK,
-                entsoeContent = "<Error>Entsoe should not be called</Error>",
-                entsoeStatus = HttpStatusCode.InternalServerError
-            ),
-            testBlock = { client ->
-                val response = client.get("/api/prices/EE/stats?range=yesterday")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val body = response.bodyAsText()
-                assertTrue(body.contains(""""countryCode":"EE""""))
-                assertTrue(body.contains(""""minPrice":0.12"""))
-                assertTrue(body.contains(""""maxPrice":0.15"""))
-                assertTrue(body.contains(""""averagePrice":0.135"""))
-                assertTrue(body.contains(""""daysCalculated":1"""))
-            }
-        )
-    }
-
-    @Test
-    fun `GET prices stats normalizes lowercase country code at route boundary`() {
-        runPriceApiTest(
-            engineHandler = createMockEngineHandler(
-                eleringContent = mockEleringSuccessJson,
-                eleringStatus = HttpStatusCode.OK,
-                entsoeContent = "<Error>Entsoe should not be called</Error>",
-                entsoeStatus = HttpStatusCode.InternalServerError
-            ),
-            testBlock = { client ->
-                val response = client.get("/api/prices/ee/stats?range=yesterday")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val body = response.bodyAsText()
-                assertTrue(body.contains(""""countryCode":"EE""""))
-            }
-        )
-    }
-
-    @Test
-    fun `GET prices stats for today should return 200 OK with statistics`() {
-        runPriceApiTest(
-            engineHandler = createMockEngineHandler(
-                eleringContent = mockEleringSuccessJson,
-                eleringStatus = HttpStatusCode.OK,
-                entsoeContent = "<Error>Entsoe should not be called</Error>",
-                entsoeStatus = HttpStatusCode.InternalServerError
-            ),
-            testBlock = { client ->
-                val response = client.get("/api/prices/EE/stats?range=today")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val body = response.bodyAsText()
-                assertTrue(body.contains(""""countryCode":"EE""""))
-                assertTrue(body.contains(""""daysCalculated":1"""))
-            }
-        )
-    }
-
-    @Test
-    fun `GET prices stats for tomorrow before publication should return 404 NotFound`() {
-        runPriceApiTest(
-            engineHandler = createMockEngineHandler(
-                eleringContent = mockEleringNoDataJson,
-                eleringStatus = HttpStatusCode.OK,
-                entsoeContent = mockEntsoeNoDataErrorXml,
-                entsoeStatus = HttpStatusCode.OK
-            ),
-            testBlock = { client ->
-                val response = client.get("/api/prices/EE/stats?range=tomorrow")
-
-                assertEquals(HttpStatusCode.NotFound, response.status)
-                val body = response.bodyAsText()
-                assertTrue(body.contains(""""error":"No data found""""))
-            }
-        )
-    }
-
-    @Test
-    fun `GET prices stats with invalid days should return 400 BadRequest`() {
-        runPriceApiTest(
-            engineHandler = createMockEngineHandler(
-                eleringContent = mockEleringSuccessJson,
-                eleringStatus = HttpStatusCode.OK,
-                entsoeContent = "<Error>Entsoe should not be called</Error>",
-                entsoeStatus = HttpStatusCode.InternalServerError
-            ),
-            testBlock = { client ->
-                val response = client.get("/api/prices/EE/stats?days=-5")
-
-                assertEquals(HttpStatusCode.BadRequest, response.status)
-            }
-        )
-    }
-
-    @Test
-    fun `GET prices stats with invalid range name should return 400 BadRequest`() {
-        runPriceApiTest(
-            engineHandler = createMockEngineHandler(
-                eleringContent = mockEleringSuccessJson,
-                eleringStatus = HttpStatusCode.OK,
-                entsoeContent = "<Error>Entsoe should not be called</Error>",
-                entsoeStatus = HttpStatusCode.InternalServerError
-            ),
-            testBlock = { client ->
-                val response = client.get("/api/prices/EE/stats?range=nextmonth")
-
-                assertEquals(HttpStatusCode.BadRequest, response.status)
             }
         )
     }
@@ -733,9 +614,7 @@ class ApplicationTest {
         val testModule = module {
             val clock = java.time.Clock.fixed(java.time.Instant.parse("2023-01-02T12:00:00Z"), java.time.ZoneOffset.UTC)
             factory { GetEnergyPricesUseCase(get(), clock) }
-            factory { GetPriceStatisticsUseCase(get(), clock) }
             factory { GetPriceSummaryUseCase(get(), clock) }
-            factory { GetRollingAveragePriceUseCase(get(), get(), clock) }
             single {
                 val monitor = get<ee.innov.eprice.monitoring.ServiceMonitor>()
                 HttpClient(mockEngine) {
@@ -749,7 +628,6 @@ class ApplicationTest {
             single(qualifier = named("entsoeApiKey")) { "TEST_KEY" }
             single<PriceCache> { NoOpPriceCache() }
             single<DailyStatsCache> { NoOpDailyStatsCache() }
-            single<DailyAveragePriceCache> { NoOpDailyAveragePriceCache() }
         }
 
         application {

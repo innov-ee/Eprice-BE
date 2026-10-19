@@ -143,18 +143,6 @@ object EndpointCatalog {
             )
         ),
         EndpointDoc(
-            category = EndpointCategory.ENERGY_PRICES,
-            method = "GET",
-            path = "/api/prices/{countryCode}/avg",
-            description = "Rolling average electricity price.",
-            samples = listOf(
-                EndpointSample(label = "EE Rolling Avg", path = "/api/prices/EE/avg"),
-                EndpointSample(label = "DE Rolling Avg", path = "/api/prices/DE/avg"),
-                EndpointSample(label = "LV Rolling Avg", path = "/api/prices/LV/avg"),
-                EndpointSample(label = "FI Rolling Avg", path = "/api/prices/FI/avg")
-            )
-        ),
-        EndpointDoc(
             category = EndpointCategory.PRICE_STATISTICS,
             method = "GET",
             path = "/api/prices/{countryCode}/stats/summary",
@@ -163,20 +151,6 @@ object EndpointCatalog {
                 EndpointSample(label = "EE Today Summary", path = "/api/prices/EE/stats/summary"),
                 EndpointSample(label = "DE Today Summary", path = "/api/prices/DE/stats/summary"),
                 EndpointSample(label = "FI Today Summary", path = "/api/prices/FI/stats/summary")
-            )
-        ),
-        EndpointDoc(
-            category = EndpointCategory.PRICE_STATISTICS,
-            method = "GET",
-            path = "/api/prices/{countryCode}/stats",
-            description = "Calculates energy price statistics for named ranges, day counts, or custom dates.",
-            samples = listOf(
-                EndpointSample(label = "Default (Past 5 Days)", path = "/api/prices/EE/stats"),
-                EndpointSample(label = "Yesterday", path = "/api/prices/EE/stats?range=yesterday"),
-                EndpointSample(label = "Today", path = "/api/prices/EE/stats?range=today"),
-                EndpointSample(label = "Tomorrow", path = "/api/prices/EE/stats?range=tomorrow"),
-                EndpointSample(label = "Past 7 Days", path = "/api/prices/EE/stats?days=7"),
-                EndpointSample(label = "Past 30 Days", path = "/api/prices/EE/stats?days=30")
             )
         ),
         EndpointDoc(

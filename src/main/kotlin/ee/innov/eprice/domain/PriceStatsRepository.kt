@@ -5,7 +5,7 @@ import java.time.LocalDate
 
 interface PriceStatsRepository {
     /**
-     * Returns per-day price statistics for every day in the inclusive range, transparently
+     * Returns statistics for complete days in the inclusive range, transparently
      * using and populating a cache so callers never deal with cache hits/misses themselves.
      */
     suspend fun getDailyStats(

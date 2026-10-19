@@ -3,6 +3,7 @@ package ee.innov.eprice.data
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.BiddingZones
+import ee.innov.eprice.domain.BiddingZone
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
@@ -44,7 +45,7 @@ class EnergyPriceRepositoryImpl(
             monitor?.recordCacheMiss()
         }
 
-        val networkResult = fetchFromNetwork(region.id, start, end)
+        val networkResult = fetchFromNetwork(region, start, end)
 
         if (cacheResults) {
             networkResult.onSuccess { prices ->
@@ -64,13 +65,11 @@ class EnergyPriceRepositoryImpl(
      * Strategy: Try Elering first for Baltic/Nordic supported countries, otherwise or on failure query ENTSO-E.
      */
     private suspend fun fetchFromNetwork(
-        normalizedCode: String,
+        region: BiddingZone,
         start: Instant,
         end: Instant
     ): Result<List<DomainEnergyPrice>> {
         // Strategy: Try Elering first if supported.
-        val region = runCatching { BiddingZones.resolve(normalizedCode) }
-            .getOrElse { return Result.failure(it) }
         if (region.eleringKey != null) {
             try {
                 val prices = eleringService.fetchPrices(region.eleringKey, start, end)
@@ -78,11 +77,11 @@ class EnergyPriceRepositoryImpl(
                     return Result.success(prices)
                 }
             } catch (e: NoDataFoundException) {
-                logger.info("Elering reported no data for $normalizedCode ($start to $end), attempting ENTSO-E fallback")
+                logger.info("Elering reported no data for ${region.id} ($start to $end), attempting ENTSO-E fallback")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                logger.warn("Elering fetch failed for $normalizedCode ($start to $end): ${e.message}, attempting ENTSO-E fallback")
+                logger.warn("Elering fetch failed for ${region.id} ($start to $end): ${e.message}, attempting ENTSO-E fallback")
             }
         }
 

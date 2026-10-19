@@ -1,6 +1,5 @@
 package ee.innov.eprice.test
 
-import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.domain.model.DailyStatEntry
@@ -27,18 +26,6 @@ class NoOpDailyStatsCache : DailyStatsCache {
     override fun clear() {}
 }
 
-class NoOpDailyAveragePriceCache : DailyAveragePriceCache {
-    override fun get(countryCode: String, date: LocalDate): Double? = null
-    override fun put(countryCode: String, date: LocalDate, averagePrice: Double) {}
-    override fun getRange(
-        countryCode: String,
-        startDate: LocalDate,
-        endDate: LocalDate
-    ): Map<LocalDate, Double> = emptyMap()
-
-    override fun clear() {}
-}
-
 class InMemoryDailyStatsCache : DailyStatsCache {
     val store = ConcurrentHashMap<String, ConcurrentHashMap<LocalDate, DailyStatEntry>>()
 
@@ -59,30 +46,6 @@ class InMemoryDailyStatsCache : DailyStatsCache {
         startDate: LocalDate,
         endDate: LocalDate
     ): Map<LocalDate, DailyStatEntry> {
-        val countryMap = store[countryCode] ?: return emptyMap()
-        return countryMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
-    }
-
-    override fun clear() {
-        store.clear()
-    }
-}
-
-class InMemoryDailyAveragePriceCache : DailyAveragePriceCache {
-    val store = ConcurrentHashMap<String, ConcurrentHashMap<LocalDate, Double>>()
-
-    override fun get(countryCode: String, date: LocalDate): Double? =
-        store[countryCode]?.get(date)
-
-    override fun put(countryCode: String, date: LocalDate, averagePrice: Double) {
-        store.getOrPut(countryCode) { ConcurrentHashMap() }[date] = averagePrice
-    }
-
-    override fun getRange(
-        countryCode: String,
-        startDate: LocalDate,
-        endDate: LocalDate
-    ): Map<LocalDate, Double> {
         val countryMap = store[countryCode] ?: return emptyMap()
         return countryMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
     }

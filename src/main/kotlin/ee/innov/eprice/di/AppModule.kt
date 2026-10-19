@@ -3,10 +3,8 @@ package ee.innov.eprice.di
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.EnergyPriceRepositoryImpl
-import ee.innov.eprice.data.FileBackedDailyAveragePriceCache
 import ee.innov.eprice.data.FileBackedDailyStatsCache
 import ee.innov.eprice.data.InMemoryPriceCache
 import ee.innov.eprice.data.PriceCache
@@ -15,9 +13,7 @@ import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
-import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
-import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
 import ee.innov.eprice.monitoring.ServiceLogs
@@ -120,10 +116,6 @@ val appModule = module {
         InMemoryPriceCache(cacheFile = resolveCachePath("eprice-cache-v2.json"))
     }
 
-    single<DailyAveragePriceCache> {
-        FileBackedDailyAveragePriceCache(cacheFile = resolveCachePath("daily-average-cache-v2.json"))
-    }
-
     single<DailyStatsCache> {
         FileBackedDailyStatsCache(cacheFile = resolveCachePath("daily-stats-cache-v2.json"))
     }
@@ -146,20 +138,6 @@ val appModule = module {
     }
 
     factory { GetEnergyPricesUseCase(energyPriceRepository = get()) }
-
-    factory {
-        GetRollingAveragePriceUseCase(
-            energyPriceRepository = get(),
-            dailyAveragePriceCache = get(),
-            monitor = get()
-        )
-    }
-
-    factory {
-        GetPriceStatisticsUseCase(
-            priceStatsRepository = get()
-        )
-    }
 
     factory {
         GetPriceSummaryUseCase(

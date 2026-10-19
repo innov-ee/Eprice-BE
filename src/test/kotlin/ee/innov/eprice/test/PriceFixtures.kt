@@ -2,6 +2,7 @@ package ee.innov.eprice.test
 
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.DomainEnergyPrice
+import ee.innov.eprice.domain.model.inRange
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -22,7 +23,7 @@ class FixedPriceRepository(private val response: Result<List<DomainEnergyPrice>>
         start: Instant,
         end: Instant,
         cacheResults: Boolean
-    ): Result<List<DomainEnergyPrice>> = response
+    ): Result<List<DomainEnergyPrice>> = response.map { it.inRange(start, end) }
 }
 
 /** Small provider-shaped fixture; currency and unit fields must not be confused with scaling. */
