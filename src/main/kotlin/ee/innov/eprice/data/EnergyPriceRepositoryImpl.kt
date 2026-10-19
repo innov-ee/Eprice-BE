@@ -1,9 +1,7 @@
 package ee.innov.eprice.data
 
 import ee.innov.eprice.data.elering.EleringService
-import ee.innov.eprice.data.elering.toDomainEnergyPrices
 import ee.innov.eprice.data.entsoe.EntsoeService
-import ee.innov.eprice.data.entsoe.toDomainEnergyPrices
 import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.DomainEnergyPrice
@@ -14,7 +12,6 @@ import ee.innov.eprice.monitoring.ServiceMonitor
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
-import ee.innov.eprice.domain.model.inRange
 
 class EnergyPriceRepositoryImpl(
     private val entsoeService: EntsoeService,
@@ -47,7 +44,7 @@ class EnergyPriceRepositoryImpl(
             monitor?.recordCacheMiss()
         }
 
-        val networkResult = fetchFromNetwork(region.id, start, end).map { it.inRange(start, end) }
+        val networkResult = fetchFromNetwork(region.id, start, end)
 
         if (cacheResults) {
             networkResult.onSuccess { prices ->
@@ -76,8 +73,7 @@ class EnergyPriceRepositoryImpl(
             .getOrElse { return Result.failure(it) }
         if (region.eleringKey != null) {
             try {
-                val eleringMarketDocument = eleringService.fetchPrices(region.eleringKey, start, end)
-                val prices = eleringMarketDocument.toDomainEnergyPrices(region.eleringKey).inRange(start, end)
+                val prices = eleringService.fetchPrices(region.eleringKey, start, end)
                 if (prices.isNotEmpty()) {
                     return Result.success(prices)
                 }
@@ -92,9 +88,7 @@ class EnergyPriceRepositoryImpl(
 
         // Try ENTSO-E
         return try {
-            val marketDocument = entsoeService.fetchPrices(region.eic, start, end)
-            val prices = marketDocument.toDomainEnergyPrices()
-            Result.success(prices)
+            Result.success(entsoeService.fetchPrices(region.eic, start, end))
         } catch (_: NoDataFoundException) {
             // "No data" from ENTSO-E is not a failure, it's just an empty list.
             Result.success(emptyList())

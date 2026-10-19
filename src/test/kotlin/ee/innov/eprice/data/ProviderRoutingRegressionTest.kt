@@ -25,6 +25,52 @@ class ProviderRoutingRegressionTest {
     private val start = Instant.parse("2026-08-22T00:00:00Z")
     private val end = Instant.parse("2026-08-22T01:00:00Z")
 
+    @Test
+    fun `provider services return domain prices clipped to the requested range`() = runBlocking {
+        val rows = (-1..4).joinToString(",") { i ->
+            """{"timestamp":${start.plusSeconds(i * 900L).epochSecond},"price":100.0}"""
+        }
+        val engine = MockEngine { request ->
+            if (request.url.host == "dashboard.elering.ee") {
+                respond("""{"success":true,"data":{"ee":[$rows]}}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            } else {
+                respond(entsoePriceXml(), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/xml"))
+            }
+        }
+        val client = HttpClient(engine)
+        try {
+            val mapper = XmlMapper().apply { registerKotlinModule(); configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false) }
+            val rangeStart = start.plusSeconds(300)
+            val rangeEnd = end.minusSeconds(300)
+            val expected = listOf(
+                DomainEnergyPrice(rangeStart, 0.1, 600),
+                DomainEnergyPrice(start.plusSeconds(900), 0.1, 900),
+                DomainEnergyPrice(start.plusSeconds(1800), 0.1, 900),
+                DomainEnergyPrice(start.plusSeconds(2700), 0.1, 600)
+            )
+            assertEquals(expected, EleringService(client).fetchPrices("EE", rangeStart, rangeEnd))
+            assertEquals(expected, EntsoeService(client, mapper, "test-token").fetchPrices("10Y1001A1001A82H", rangeStart, rangeEnd))
+        } finally { client.close() }
+    }
+
+    @Test
+    fun `Elering validation failures still trigger ENTSO-E fallback`() = runBlocking {
+        val hosts = mutableListOf<String>()
+        val row = """{"timestamp":${start.epochSecond},"price":100.0}"""
+        val engine = MockEngine { request ->
+            hosts.add(request.url.host)
+            if (request.url.host == "dashboard.elering.ee") {
+                respond("""{"success":true,"data":{"ee":[$row,$row]}}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            } else {
+                respond(entsoePriceXml(), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/xml"))
+            }
+        }
+        withRepository(engine) { repo ->
+            assertEquals(4, repo.getPrices("EE", start, end, false).getOrThrow().size)
+            assertEquals(listOf("dashboard.elering.ee", "web-api.tp.entsoe.eu"), hosts)
+        }
+    }
+
     private suspend fun withRepository(engine: MockEngine, block: suspend (EnergyPriceRepositoryImpl) -> Unit) {
         val client = HttpClient(engine)
         try {
