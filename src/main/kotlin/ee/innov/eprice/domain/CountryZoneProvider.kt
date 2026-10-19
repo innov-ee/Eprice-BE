@@ -3,7 +3,6 @@ package ee.innov.eprice.domain
 import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
-import java.util.Locale
 
 private val biddingZoneCodeAliases = mapOf(
     "DE-LU" to "DE_LU",
@@ -32,7 +31,7 @@ private val biddingZoneCodeAliases = mapOf(
  * EIC identifiers retain their hyphens; supported areas are validated by BiddingZones.
  */
 fun String.normalizeCountryCode(): String {
-    val code = trim().uppercase(Locale.ROOT)
+    val code = trim().uppercase()
     return biddingZoneCodeAliases[code] ?: code
 }
 

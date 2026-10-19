@@ -5,7 +5,6 @@ import ee.innov.eprice.domain.model.InvalidPriceDataException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.Instant
-import java.util.Locale
 
 @Serializable
 data class EleringPriceResponse(
@@ -15,7 +14,7 @@ data class EleringPriceResponse(
 ) {
     // map keys always to be uppercase
     val data: Map<String, List<EleringPriceData>> by lazy {
-        _data.mapKeys { it.key.uppercase(Locale.ROOT) }
+        _data.mapKeys { it.key.uppercase() }
     }
 }
 

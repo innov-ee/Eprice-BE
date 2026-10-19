@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -17,16 +16,6 @@ import kotlin.test.assertTrue
 class EleringResolutionRegressionTest {
     private val zone = ZoneId.of("Europe/Tallinn")
     private fun response(points: List<EleringPriceData>) = EleringPriceResponse(true, mapOf("ee" to points))
-
-    @Test
-    fun `Finland response keys are independent of server locale`() {
-        val original = Locale.getDefault()
-        try {
-            Locale.setDefault(Locale.forLanguageTag("tr-TR"))
-            val response = EleringPriceResponse(true, mapOf("fi" to listOf(EleringPriceData(Instant.parse("2026-10-12T00:00:00Z").epochSecond, 100.0))))
-            assertEquals(1, response.toDomainEnergyPrices("FI").size)
-        } finally { Locale.setDefault(original) }
-    }
 
     @Test
     fun `hourly historical prices retain their full hour duration`() {

@@ -7,7 +7,7 @@ COPY . .
 
 ARG GIT_COMMIT=unknown
 ARG BUILD_TIME=unknown
-# Metadata travels inside the JAR when the tested image is promoted to prod.
+# Creates file with metadata inside the image that monitor.html will later display
 RUN printf 'commit=%s\nbuiltAt=%s\n' "$GIT_COMMIT" "$BUILD_TIME" > src/main/resources/build-info.properties
 
 # Run the 'buildFatJar' task explicitly to create the '-all.jar'
