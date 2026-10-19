@@ -57,8 +57,6 @@ jobs:
           build-args: |
             GIT_COMMIT=${{ github.sha }}
             BUILD_TIME=${{ steps.image.outputs.built_at }}
-          labels: |
-            org.opencontainers.image.created=${{ steps.image.outputs.built_at }}
       # Step to skip ACC deploy if a new commit been pushed meanwhile
       # Sets `outputs.current` which `Deploy to acc` uses do decide if it should run
       - name: Skip a stale main commit
