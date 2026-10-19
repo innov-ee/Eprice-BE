@@ -772,14 +772,6 @@
                 </div>
                 <div class="monitor-actions">
                     <span id="serviceLogsStatus" class="last-updated-text" role="status">Loading...</span>
-                    <div class="auto-refresh">
-                        <label for="serviceLogLevel">Minimum level</label>
-                        <select id="serviceLogLevel" onchange="renderServiceLogs()">
-                            <option value="INFO">Info</option>
-                            <option value="WARN">Warn</option>
-                            <option value="ERROR">Error</option>
-                        </select>
-                    </div>
                     <button class="btn btn-sm" id="refreshServiceLogsBtn" onclick="refreshServiceLogs()">Refresh logs</button>
                 </div>
             </div>
@@ -937,7 +929,6 @@
         }
 
         // 2. Fetch Live Monitor Stats
-        let serviceLogEntries = [];
         let serviceLogsLoading = false;
 
         async function refreshServiceLogs() {
@@ -950,9 +941,9 @@
                 const response = await fetch("/monitor/logs", { cache: "no-store" });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const snapshot = await response.json();
-                serviceLogEntries = snapshot.entries || [];
-                renderServiceLogs();
-                status.textContent = `${serviceLogEntries.length} entries · updated ${formatTallinnTimestamp(new Date().toISOString())}`;
+                const entries = snapshot.entries || [];
+                renderServiceLogs(entries);
+                status.textContent = `${entries.length} entries · updated ${formatTallinnTimestamp(new Date().toISOString())}`;
             } catch (error) {
                 status.textContent = `Logs unavailable (${error.message}) · displayed entries may be stale`;
             } finally {
@@ -961,14 +952,12 @@
             }
         }
 
-        function renderServiceLogs() {
+        function renderServiceLogs(entries) {
             const output = document.getElementById("serviceLogOutput");
             const followLatest = output.scrollHeight - output.scrollTop - output.clientHeight < 40;
-            const level = document.getElementById("serviceLogLevel").value;
-            const entries = serviceLogEntries.filter(entry => level === "INFO" || entry.level === level || (level === "WARN" && entry.level === "ERROR"));
             output.replaceChildren();
             if (!entries.length) {
-                output.textContent = "No matching log entries.";
+                output.textContent = "No log entries.";
             } else {
                 for (const entry of entries) {
                     const line = document.createElement("div");

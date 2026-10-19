@@ -15,6 +15,7 @@ class ServiceMonitorTest {
         val after = monitor.getStats()
 
         assertEquals(identity, after.identity)
+        assertEquals(before.identity, after.identity)
         assertEquals(before.startedAt, after.startedAt)
         java.time.Instant.parse(after.startedAt)
     }

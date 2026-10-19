@@ -17,9 +17,6 @@ RUN chmod +x ./gradlew && ./gradlew buildFatJar -x test --no-daemon
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-ARG GIT_COMMIT=unknown
-LABEL org.opencontainers.image.revision=$GIT_COMMIT
-
 # Non-root user for security and cache directory setup
 RUN addgroup -S appgroup && \
     adduser -S appuser -G appgroup && \

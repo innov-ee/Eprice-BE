@@ -127,13 +127,6 @@ object EndpointCatalog {
         EndpointDoc(
             category = EndpointCategory.ENERGY_PRICES,
             method = "GET",
-            path = "/api/meta/regions",
-            description = "Configured price areas, local timezones and providers. Price availability depends on the provider and date.",
-            samples = listOf(EndpointSample(label = "Configured Regions", path = "/api/meta/regions"))
-        ),
-        EndpointDoc(
-            category = EndpointCategory.ENERGY_PRICES,
-            method = "GET",
             path = "/api/prices/{countryCode?}",
             description = "Available energy price intervals for yesterday, today and tomorrow in the area's local timezone.",
             samples = listOf(
