@@ -31,7 +31,7 @@ data class PriceStatistics(
             val minPrice = dailyStats.minOf { it.min }
             val maxPrice = dailyStats.maxOf { it.max }
             val seconds = dailyStats.sumOf { it.durationSeconds }
-            val averagePrice = if (seconds > 0) dailyStats.sumOf { it.avg * it.durationSeconds } / seconds else 0.0
+            val averagePrice = dailyStats.sumOf { it.avg * it.durationSeconds } / seconds
 
             return PriceStatistics(
                 countryCode = countryCode,

@@ -1,17 +1,21 @@
 package ee.innov.eprice.data
 
+import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.model.PriceStatistics
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.DomainEnergyPrice
+import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.test.FixedPriceRepository
 import ee.innov.eprice.test.InMemoryDailyStatsCache
 import ee.innov.eprice.test.dayPrices
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -19,6 +23,29 @@ import kotlin.test.assertTrue
 class DailyPriceStatisticsRegressionTest {
     private val date = LocalDate.of(2026, 8, 22)
     private val zone = ZoneId.of("Europe/Berlin")
+
+    @Test
+    fun `statistics repository excludes partial days before the summary consumes them`() = runBlocking {
+        val clock = Clock.fixed(Instant.parse("2026-08-22T12:00:00Z"), ZoneOffset.UTC)
+        listOf(-1L, 0L, 1L).forEach { partialDayOffset ->
+            val partialDate = date.plusDays(partialDayOffset)
+            val prices = (-1L..1L).flatMap { offset ->
+                val day = date.plusDays(offset)
+                val intervals = dayPrices(day, zone)
+                if (day == partialDate) intervals.take(8) else intervals
+            }
+            val cache = InMemoryDailyStatsCache()
+            val repository = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(prices)), cache)
+            val result = GetPriceSummaryUseCase(repository, clock, rollingDays = 1).execute("DE_LU")
+
+            if (partialDayOffset == 1L) {
+                assertEquals(null, result.getOrThrow().tomorrow)
+            } else {
+                assertTrue(result.exceptionOrNull() is NoDataFoundException)
+            }
+            assertEquals(null, cache.get("DE_LU", partialDate))
+        }
+    }
 
     @Test
     fun `equal duration days have equal weight across an hourly to quarter hourly transition`() {

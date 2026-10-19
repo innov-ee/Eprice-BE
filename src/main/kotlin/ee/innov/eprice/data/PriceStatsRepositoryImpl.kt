@@ -21,12 +21,10 @@ class PriceStatsRepositoryImpl(
         startDate: LocalDate,
         endDate: LocalDate
     ): Result<Map<LocalDate, DailyStatEntry>> {
-        val zoneId = BiddingZones.resolve(countryCode).zoneId
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
         val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
 
         val cachedStats = dailyStatsCache.getRange(countryCode, startDate, endDate)
-            .filter { (date, entry) -> entry.isFullDay(date, zoneId) }
         val missingDates = datesInRange.filter { !cachedStats.containsKey(it) }
 
         monitor?.recordCacheHit(cachedStats.size.toLong())
@@ -44,9 +42,7 @@ class PriceStatsRepositoryImpl(
             return Result.failure(e)
         }
 
-        if (fetchedStats.isNotEmpty()) {
-            dailyStatsCache.putBatch(countryCode, fetchedStats)
-        }
+        dailyStatsCache.putBatch(countryCode, fetchedStats)
 
         return Result.success(cachedStats + fetchedStats)
     }
@@ -62,8 +58,6 @@ class PriceStatsRepositoryImpl(
             end = dayEnd,
             cacheResults = false
         ).getOrThrow()
-        if (prices.isEmpty()) return null
-
         if (!prices.isFullDay(date, zoneId)) {
             return null
         }

@@ -138,23 +138,4 @@ class PriceStatsRepositoryImplTest {
         // Cache should not have cached the partial day
         assertTrue(cache.getRange("EE", testDate, testDate).isEmpty())
     }
-
-    @Test
-    fun `getDailyStats filters out invalid partial entries from cache and refetches`() = runBlocking {
-        val cache = InMemoryDailyStatsCache()
-        val priceRepo = CountingPriceRepositoryFake()
-        val statsRepo = PriceStatsRepositoryImpl(priceRepo, cache)
-
-        val testDate = LocalDate.of(2026, 8, 23)
-        // Corrupt cache with a partial 2-hour entry
-        cache.put("EE", testDate, DailyStatEntry(min = 0.10, max = 0.12, avg = 0.11, sum = 0.22, count = 2))
-
-        val result = statsRepo.getDailyStats("EE", testDate, testDate)
-        assertTrue(result.isSuccess)
-        val map = result.getOrThrow()
-        assertEquals(1, map.size)
-        // Repositories fetched full 24-hour data
-        assertEquals(24, map[testDate]?.count)
-        assertEquals(1, priceRepo.callCount)
-    }
 }

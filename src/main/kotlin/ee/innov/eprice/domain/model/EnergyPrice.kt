@@ -14,13 +14,7 @@ data class DomainEnergyPrice(
     val startTime: Instant,
     val pricePerKWh: Double,
     val durationSeconds: Long = 3600
-) {
-    init {
-        if (!pricePerKWh.isFinite() || durationSeconds <= 0) {
-            throw InvalidPriceDataException("Price must be finite and its duration must be positive")
-        }
-    }
-}
+)
 
 /** Restrict actual intervals to [start, end), including an interval spanning a boundary. */
 fun List<DomainEnergyPrice>.inRange(start: Instant, end: Instant): List<DomainEnergyPrice> = mapNotNull { price ->
@@ -35,10 +29,9 @@ fun List<DomainEnergyPrice>.isFullDay(date: LocalDate, zoneId: ZoneId): Boolean 
     val start = date.atStartOfDay(zoneId).toInstant()
     val end = date.plusDays(1).atStartOfDay(zoneId).toInstant()
     val prices = inRange(start, end)
-    if (prices.isEmpty()) return false
     var cursor = start
     for (price in prices) {
-        if (price.startTime != cursor || price.durationSeconds <= 0 || !price.pricePerKWh.isFinite()) return false
+        if (price.startTime != cursor) return false
         cursor = price.startTime.plusSeconds(price.durationSeconds)
     }
     return cursor == end

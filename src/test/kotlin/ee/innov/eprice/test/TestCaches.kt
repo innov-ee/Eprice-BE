@@ -37,8 +37,7 @@ class InMemoryDailyStatsCache : DailyStatsCache {
     }
 
     override fun putBatch(countryCode: String, entries: Map<LocalDate, DailyStatEntry>) {
-        val countryMap = store.getOrPut(countryCode) { ConcurrentHashMap() }
-        countryMap.putAll(entries)
+        entries.forEach { (date, stats) -> put(countryCode, date, stats) }
     }
 
     override fun getRange(

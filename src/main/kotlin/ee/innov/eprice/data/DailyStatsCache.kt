@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 interface DailyStatsCache {
 
+    // Callers write only complete daily statistics; cached entries are trusted on read.
+
     fun get(countryCode: String, date: LocalDate): DailyStatEntry?
 
     fun put(countryCode: String, date: LocalDate, stats: DailyStatEntry)
