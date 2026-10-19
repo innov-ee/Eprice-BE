@@ -8,7 +8,7 @@ class ServiceMonitorTest {
 
     @Test
     fun `identity and startup time remain stable across stats snapshots`() {
-        val identity = ServiceIdentity("a".repeat(40), "2026-10-14T10:30:00Z", "acc-1")
+        val identity = ServiceIdentity("a".repeat(40), "2026-10-14T10:30:00Z")
         val monitor = ServiceMonitor(identity)
         val before = monitor.getStats()
         monitor.incrementIncoming()

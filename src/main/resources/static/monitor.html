@@ -715,7 +715,6 @@
             <dl class="service-identity" aria-label="Running service identity">
                 <div><dt>Commit</dt><dd id="identityCommit">--</dd></div>
                 <div><dt>Built</dt><dd id="identityBuiltAt">--</dd></div>
-                <div><dt>Instance</dt><dd id="identityInstance">--</dd></div>
                 <div><dt>Started</dt><dd id="identityStartedAt">--</dd></div>
             </dl>
             <div class="stats-grid">
@@ -1005,7 +1004,6 @@
                     commit.textContent = (identity.commit || "unknown").slice(0, 12);
                     commit.title = identity.commit || "unknown";
                     document.getElementById("identityBuiltAt").textContent = formatTallinnTimestamp(identity.builtAt);
-                    document.getElementById("identityInstance").textContent = identity.instanceId || "unknown";
                     document.getElementById("identityStartedAt").textContent = formatTallinnTimestamp(stats.startedAt);
                     document.getElementById("statUptime").textContent = stats.uptime || "--";
 
