@@ -30,3 +30,4 @@ Thumbs.db
 /daily-average-cache-v2.json*
 /daily-stats-cache-v2.json*
 /data/
+/.vscode/settings.json
