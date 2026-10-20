@@ -26,6 +26,10 @@ import io.ktor.http.headersOf
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.koin.core.context.GlobalContext
@@ -228,6 +232,38 @@ class ApplicationTest {
                 assertTrue(body.contains(""""rolling":{"""))
                 assertTrue(body.contains(""""yesterday":{"""))
                 assertTrue(body.contains(""""today":{"""))
+            }
+        )
+    }
+
+    @Test
+    fun `cache overview is admin only and counts only valid authenticated stats calls`() {
+        runPriceApiTest(
+            engineHandler = { error("Cache inspection must never fetch upstream data") },
+            testBlock = { admin ->
+                val path = "/monitor/caches"
+                assertEquals(HttpStatusCode.Unauthorized, client.get(path).status)
+                assertEquals(HttpStatusCode.Unauthorized, client.get(path) {
+                    header("X-API-Key", KeyRotationService().getKeyInfo().operationalKey)
+                }.status)
+                assertEquals(HttpStatusCode.Unauthorized, client.get(path) {
+                    header("X-Bootstrap-Key", "test-bootstrap-key")
+                }.status)
+                val first = admin.get(path)
+                assertEquals(HttpStatusCode.OK, first.status)
+                assertEquals("no-store", first.headers[HttpHeaders.CacheControl])
+                assertTrue(first.bodyAsText().contains("\"statsRequests\":0"))
+                admin.get("/api/prices/EE/stats/summary") // A failed request still counts.
+                admin.get("/api/prices/invalid/stats/summary")
+                client.get("/api/prices/FI/stats/summary") // Unauthenticated calls do not count.
+                admin.get("/api/prices/FI") // Price calls do not count.
+                val regions = Json.parseToJsonElement(admin.get(path).bodyAsText()).jsonObject
+                    .getValue("regions").jsonArray
+                fun count(region: String): String = regions.map { it.jsonObject }
+                    .first { it.getValue("region").jsonPrimitive.content == region }
+                    .getValue("statsRequests").jsonPrimitive.content
+                assertEquals("1", count("EE"))
+                assertEquals("0", count("FI"))
             }
         )
     }
