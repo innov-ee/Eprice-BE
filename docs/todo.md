@@ -1,5 +1,4 @@
 # TODO
-- Always use SDAC day-ahead prices consistently for prices and statistics. ENTSO-E returns both SDAC (Sequence 1) and EXAA (Sequence 2) for Germany–Luxembourg; Austria also publishes both. In `EntsoeService`, request `contract_MarketAgreement.type=A01` and `classificationSequence_AttributeInstanceComponent.position=1` for regions with multiple sequences. Add the sequence field to `TimeSeries` and validate/filter it before merging intervals; never mix, average, or silently fall back to EXAA. Test conflicting Sequence 1/2 prices and missing SDAC data. Live DE-LU responses currently fail with "Conflicting price series for the same UTC interval" at both 7-day and 32-day ranges. See [ENTSO-E explanatory notes](https://eepublicdownloads.blob.core.windows.net/tp-reporting-exports/Explanatory%20Notes.xlsx).
 - Requests for tomorrows prices can miss cache before noon, and this means they fall thru to actual requests every time - undesired, improve!
 - For each region also list currency
 

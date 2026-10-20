@@ -55,6 +55,9 @@ class EntsoeService(
             url {
                 parameters.append("securityToken", apiKey)
                 parameters.append("documentType", "A44")
+                // Use the standard SDAC day-ahead auction consistently for every region.
+                parameters.append("contract_MarketAgreement.type", "A01")
+                // Select SDAC in the parser: filtering Sequence 1 here hides regions with no sequence tag.
                 parameters.append("in_Domain", biddingZone)
                 parameters.append("out_Domain", biddingZone)
                 parameters.append("periodStart", periodStart)

@@ -40,8 +40,12 @@ private data class DailyStatsCacheFile(
 )
 
 class FileBackedDailyStatsCache(
-    cacheFile: Path = Paths.get("daily-stats-cache-v2.json")
+    cacheFile: Path = Paths.get(FILE_NAME)
 ) : BaseFileCache(cacheFile), DailyStatsCache {
+
+    companion object {
+        const val FILE_NAME = "daily-stats-cache-v3-sdac.json"
+    }
 
     // In-memory thread-safe cache
     private val cache: ConcurrentHashMap<String, ConcurrentHashMap<String, DailyStatEntry>>

@@ -25,7 +25,11 @@ data class TimeSeries(
     val priceUnit: String? = null,
     @JsonProperty("Period")
     @JacksonXmlElementWrapper(useWrapping = false)
-    val period: List<Period> = emptyList()
+    val period: List<Period> = emptyList(),
+    @JsonProperty("contract_MarketAgreement.type")
+    val contractMarketAgreementType: String? = null,
+    @JsonProperty("classificationSequence_AttributeInstanceComponent.position")
+    val classificationSequence: Int? = null
 )
 
 data class Period(
@@ -60,7 +64,11 @@ private fun parseResolutionSeconds(resolution: String): Long {
 }
 
 fun PublicationMarketDocument.toDomainEnergyPrices(): List<DomainEnergyPrice> {
-    return timeSeries.flatMap { series ->
+    // Older responses may omit auction metadata. Never substitute an explicitly different auction.
+    return timeSeries.filter { series ->
+        (series.contractMarketAgreementType == null || series.contractMarketAgreementType == "A01") &&
+            (series.classificationSequence == null || series.classificationSequence == 1)
+    }.flatMap { series ->
         series.validateCurrencyAndUnit()
         val curve = series.validatedCurveType()
         series.period.flatMap { it.toDomainEnergyPrices(curve) }
