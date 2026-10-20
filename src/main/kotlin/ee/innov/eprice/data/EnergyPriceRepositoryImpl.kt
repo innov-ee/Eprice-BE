@@ -8,6 +8,7 @@ import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.domain.model.isCompleteRange
+import ee.innov.eprice.domain.model.inRange
 import ee.innov.eprice.domain.model.toApiError
 import ee.innov.eprice.monitoring.ServiceMonitor
 import org.slf4j.LoggerFactory
@@ -71,21 +72,52 @@ class EnergyPriceRepositoryImpl(
     ): Result<List<DomainEnergyPrice>> {
         // Strategy: Try Elering first if supported.
         if (region.eleringKey != null) {
-            try {
-                val prices = eleringService.fetchPrices(region.eleringKey, start, end)
-                if (prices.isNotEmpty()) {
-                    return Result.success(prices)
-                }
+            val prices = try {
+                eleringService.fetchPrices(region.eleringKey, start, end)
             } catch (e: NoDataFoundException) {
                 logger.info("Elering reported no data for ${region.id} ($start to $end), attempting ENTSO-E fallback")
+                emptyList()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 logger.warn("Elering fetch failed for ${region.id} ($start to $end): ${e.message}, attempting ENTSO-E fallback")
+                emptyList()
+            }
+            if (prices.isNotEmpty()) {
+                return fillEmptyDays(region, start, end, prices)
             }
         }
 
-        // Try ENTSO-E
+        return fetchEntsoe(region, start, end)
+    }
+
+    /** Preserve the per-day fallback when a batched Elering response omits entire days. */
+    private suspend fun fillEmptyDays(
+        region: BiddingZone,
+        start: Instant,
+        end: Instant,
+        prices: List<DomainEnergyPrice>
+    ): Result<List<DomainEnergyPrice>> {
+        val combined = prices.toMutableList()
+        var date = start.atZone(region.zoneId).toLocalDate()
+        var gapStart: Instant? = null
+        while (date.atStartOfDay(region.zoneId).toInstant() < end) {
+            val dayStart = maxOf(start, date.atStartOfDay(region.zoneId).toInstant())
+            val dayEnd = minOf(end, date.plusDays(1).atStartOfDay(region.zoneId).toInstant())
+            val empty = prices.inRange(dayStart, dayEnd).isEmpty()
+            if (empty && gapStart == null) gapStart = dayStart
+            if (gapStart != null && (!empty || dayEnd == end)) {
+                val gapEnd = if (empty) dayEnd else dayStart
+                val fallback = fetchEntsoe(region, gapStart, gapEnd).getOrElse { return Result.failure(it) }
+                combined.addAll(fallback)
+                gapStart = null
+            }
+            date = date.plusDays(1)
+        }
+        return Result.success(combined.sortedBy { it.startTime })
+    }
+
+    private suspend fun fetchEntsoe(region: BiddingZone, start: Instant, end: Instant): Result<List<DomainEnergyPrice>> {
         return try {
             Result.success(entsoeService.fetchPrices(region.eic, start, end))
         } catch (_: NoDataFoundException) {

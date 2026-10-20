@@ -2,6 +2,8 @@ package ee.innov.eprice.data
 
 import ee.innov.eprice.domain.model.DailyStatEntry
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.LocalDate
@@ -24,12 +26,17 @@ interface DailyStatsCache {
         endDate: LocalDate
     ): Map<LocalDate, DailyStatEntry>
 
+    fun getMissing(countryCode: String, date: LocalDate): MissingDailyStats?
+
+    fun putMissingBatch(countryCode: String, entries: Map<LocalDate, MissingDailyStats>)
+
     fun clear()
 }
 
 @Serializable
 private data class DailyStatsCacheFile(
-    val data: Map<String, Map<String, DailyStatEntry>> = emptyMap()
+    val data: Map<String, Map<String, DailyStatEntry>> = emptyMap(),
+    val missing: Map<String, Map<String, MissingDailyStats>> = emptyMap()
 )
 
 class FileBackedDailyStatsCache(
@@ -39,8 +46,12 @@ class FileBackedDailyStatsCache(
     // In-memory thread-safe cache
     private val cache: ConcurrentHashMap<String, ConcurrentHashMap<String, DailyStatEntry>>
 
+    private val missing = ConcurrentHashMap<String, ConcurrentHashMap<String, MissingDailyStats>>()
+
     init {
-        cache = loadCacheFromFile()
+        val saved = loadFromFile<DailyStatsCacheFile>() ?: DailyStatsCacheFile()
+        cache = ConcurrentHashMap(saved.data.mapValues { ConcurrentHashMap(it.value) })
+        missing.putAll(saved.missing.mapValues { ConcurrentHashMap(it.value) })
     }
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE // "yyyy-MM-dd"
@@ -56,6 +67,7 @@ class FileBackedDailyStatsCache(
 
         val countryCache = cache.getOrPut(countryCode) { ConcurrentHashMap() }
         countryCache[dateString] = stats
+        missing[countryCode]?.remove(dateString)
 
         writeCacheToFile()
     }
@@ -67,12 +79,28 @@ class FileBackedDailyStatsCache(
         entries.forEach { (date, stats) ->
             val dateString = date.format(dateFormatter)
             countryCache[dateString] = stats
+            missing[countryCode]?.remove(dateString)
         }
 
         writeCacheToFile()
     }
 
-    private fun writeCacheToFile() = saveToFileAsync(DailyStatsCacheFile(snapshot()))
+    override fun getMissing(countryCode: String, date: LocalDate): MissingDailyStats? =
+        missing[countryCode]?.get(date.format(dateFormatter))
+
+    override fun putMissingBatch(countryCode: String, entries: Map<LocalDate, MissingDailyStats>) {
+        if (entries.isEmpty()) return
+        val countryMissing = missing.getOrPut(countryCode) { ConcurrentHashMap() }
+        entries.forEach { (date, entry) -> countryMissing[date.format(dateFormatter)] = entry }
+        writeCacheToFile()
+    }
+
+    private fun writeCacheToFile() = scope.launch {
+        persistMutex.withLock {
+            // Snapshot when writing so queued writes cannot restore older cooldowns or data.
+            persistCache(DailyStatsCacheFile(snapshot(), missing.mapValues { it.value.toMap() }))
+        }
+    }
 
     override fun getRange(
         countryCode: String,
@@ -88,6 +116,7 @@ class FileBackedDailyStatsCache(
 
     override fun clear() {
         cache.clear()
+        missing.clear()
         println("In-memory daily stats cache cleared.")
         clearFileAsync()
     }
@@ -105,20 +134,4 @@ class FileBackedDailyStatsCache(
     // Defensive copy so serialization isn't reading a map that's still being mutated concurrently.
     private fun snapshot(): Map<String, Map<String, DailyStatEntry>> =
         cache.mapValues { it.value.toMap() }
-
-    private fun loadCacheFromFile(): ConcurrentHashMap<String, ConcurrentHashMap<String, DailyStatEntry>> {
-        val deserialized = loadFromFile<DailyStatsCacheFile>()
-        if (deserialized == null) {
-            println("No daily stats cache file found. Starting with an empty cache.")
-            return ConcurrentHashMap()
-        }
-
-        println("Loaded ${deserialized.data.values.sumOf { it.size }} daily stats entries from $cacheFile.")
-
-        val concurrentMap = ConcurrentHashMap<String, ConcurrentHashMap<String, DailyStatEntry>>()
-        deserialized.data.forEach { (country, dateMap) ->
-            concurrentMap[country] = ConcurrentHashMap(dateMap)
-        }
-        return concurrentMap
-    }
 }

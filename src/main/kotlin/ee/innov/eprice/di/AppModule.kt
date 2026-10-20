@@ -32,6 +32,7 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.http.HttpHeaders
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import org.koin.dsl.onClose
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -141,7 +142,7 @@ val appModule = module {
             dailyStatsCache = get(),
             monitor = get()
         )
-    }
+    } onClose { (it as? PriceStatsRepositoryImpl)?.close() }
 
     factory { GetEnergyPricesUseCase(energyPriceRepository = get()) }
 

@@ -212,12 +212,13 @@ class ApplicationTest {
     @Test
     fun `GET prices stats summary should return 200 OK with combined summary`() {
         runPriceApiTest(
-            engineHandler = createMockEngineHandler(
-                eleringContent = mockEleringSuccessJson,
-                eleringStatus = HttpStatusCode.OK,
-                entsoeContent = "<Error>Entsoe should not be called</Error>",
-                entsoeStatus = HttpStatusCode.InternalServerError
-            ),
+            engineHandler = { request ->
+                assertEquals("dashboard.elering.ee", request.url.host)
+                val start = java.time.Instant.parse(request.url.parameters["start"])
+                val end = java.time.Instant.parse(request.url.parameters["end"])
+                val hours = java.time.Duration.between(start, end).toHours().toInt()
+                mockJsonResponse(generateEleringDailyJson(start, hours), HttpStatusCode.OK)
+            },
             testBlock = { client ->
                 val response = client.get("/api/prices/EE/stats/summary")
 
@@ -579,13 +580,9 @@ class ApplicationTest {
                         try {
                             val startInstant = java.time.Instant.parse(startParam)
                             val endInstant = java.time.Instant.parse(endParam)
-                            val durationSeconds = java.time.Duration.between(startInstant, endInstant).seconds
-                            if (durationSeconds <= 86400) {
-                                val content = generateEleringDailyJson(startInstant)
-                                mockJsonResponse(content, eleringStatus)
-                            } else {
-                                mockJsonResponse(eleringContent, eleringStatus)
-                            }
+                            // A successful Elering-only fixture must cover every requested day.
+                            val hours = java.time.Duration.between(startInstant, endInstant).toHours().toInt()
+                            mockJsonResponse(generateEleringDailyJson(startInstant, hours), eleringStatus)
                         } catch (_: Exception) {
                             mockJsonResponse(eleringContent, eleringStatus)
                         }

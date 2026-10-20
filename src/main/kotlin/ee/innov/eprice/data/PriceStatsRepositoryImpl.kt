@@ -5,18 +5,84 @@ import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.isFullDay
+import ee.innov.eprice.domain.model.inRange
+import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.monitoring.ServiceMonitor
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
 
 class PriceStatsRepositoryImpl(
     private val energyPriceRepository: EnergyPriceRepository,
     private val dailyStatsCache: DailyStatsCache,
-    private val monitor: ServiceMonitor? = null
-) : PriceStatsRepository {
+    private val monitor: ServiceMonitor? = null,
+    private val clock: Clock = Clock.systemUTC(),
+    private val refreshPolicy: StatsRefreshPolicy = StatsRefreshPolicy(),
+    private val errorCooldown: Duration = Duration.ofSeconds(30)
+) : PriceStatsRepository, AutoCloseable {
+
+    init {
+        require(!errorCooldown.isNegative) { "Error cooldown must not be negative" }
+    }
+
+    private val fetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private data class PendingStats(
+        val start: LocalDate,
+        val end: LocalDate,
+        val result: Deferred<Result<Map<LocalDate, DailyStatEntry>>>
+    )
+    private val inFlight = mutableMapOf<String, PendingStats>()
+    private data class FailedFetch(val error: Exception, val retryAt: Instant)
+    private val failedFetches = ConcurrentHashMap<String, FailedFetch>()
 
     override suspend fun getDailyStats(
+        countryCode: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Result<Map<LocalDate, DailyStatEntry>> {
+        while (true) {
+            // One fill per region. Other regions remain independent. Never suspend under this lock.
+            val pending = synchronized(inFlight) {
+                inFlight[countryCode] ?: run {
+                    val result = fetchScope.async(start = CoroutineStart.LAZY) {
+                        loadDailyStats(countryCode, startDate, endDate)
+                    }
+                    val fetch = PendingStats(startDate, endDate, result)
+                    inFlight[countryCode] = fetch
+                    result.invokeOnCompletion {
+                        synchronized(inFlight) {
+                            if (inFlight[countryCode] === fetch) inFlight.remove(countryCode)
+                        }
+                    }
+                    result.start()
+                    fetch
+                }
+            }
+            // Cancelling an HTTP caller cancels only its wait, not the shared fill.
+            val result = pending.result.await()
+            if (startDate >= pending.start && endDate <= pending.end) {
+                return result.map { stats -> stats.filterKeys { it >= startDate && it <= endDate } }
+            }
+            // An overlapping range finished: recheck complete days and cooldowns before extending it.
+        }
+    }
+
+    override fun close() {
+        fetchScope.cancel()
+    }
+
+    private suspend fun loadDailyStats(
         countryCode: String,
         startDate: LocalDate,
         endDate: LocalDate
@@ -30,40 +96,52 @@ class PriceStatsRepositoryImpl(
         monitor?.recordCacheHit(cachedStats.size.toLong())
         monitor?.recordCacheMiss(missingDates.size.toLong())
 
-        if (missingDates.isEmpty()) {
-            return Result.success(cachedStats)
-        }
+        val dueDates = missingDates.filter { date ->
+            dailyStatsCache.getMissing(countryCode, date)?.nextCheckAt?.isAfter(clock.instant()) != true
+        }.toSet()
+        if (dueDates.isEmpty()) return Result.success(cachedStats)
 
-        val fetchedStats = try {
-            missingDates.mapNotNull { date -> fetchDailyStat(countryCode, date) }.toMap()
+        // Serve the cache during cooldowns; otherwise refresh the entire requested window once.
+        failedFetches[countryCode]?.let { failed ->
+            if (failed.retryAt.isAfter(clock.instant())) return Result.failure(failed.error)
+            failedFetches.remove(countryCode, failed)
+        }
+        return try {
+            val zoneId = BiddingZones.resolve(countryCode).zoneId
+            val start = startDate.atStartOfDay(zoneId).toInstant()
+            val end = endDate.plusDays(1).atStartOfDay(zoneId).toInstant()
+            val prices = energyPriceRepository.getPrices(countryCode, start, end, cacheResults = false).getOrThrow()
+
+            val missing = mutableMapOf<LocalDate, MissingDailyStats>()
+            val fetchedStats = missingDates.mapNotNull { date ->
+                val dayStart = date.atStartOfDay(zoneId).toInstant()
+                val dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant()
+                val dayPrices = prices.inRange(dayStart, dayEnd)
+                if (dayPrices.isFullDay(date, zoneId)) {
+                    date to dailyStat(dayPrices)
+                } else {
+                    // Incidental checks can recover a gap, but must not extend its active cooldown.
+                    if (date in dueDates) {
+                        val reason = if (dayPrices.isEmpty()) MissingStatsReason.NO_DATA else MissingStatsReason.PARTIAL
+                        missing[date] = refreshPolicy.missing(date, zoneId, clock.instant(), dailyStatsCache.getMissing(countryCode, date), reason)
+                    }
+                    null
+                }
+            }.toMap()
+            dailyStatsCache.putMissingBatch(countryCode, missing)
+            dailyStatsCache.putBatch(countryCode, fetchedStats)
+            Result.success(cachedStats + fetchedStats)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return Result.failure(e)
+            failedFetches[countryCode] = FailedFetch(e, clock.instant().plus(errorCooldown))
+            Result.failure(e)
         }
-
-        dailyStatsCache.putBatch(countryCode, fetchedStats)
-
-        return Result.success(cachedStats + fetchedStats)
     }
 
-    private suspend fun fetchDailyStat(countryCode: String, date: LocalDate): Pair<LocalDate, DailyStatEntry>? {
-        val zoneId = BiddingZones.resolve(countryCode).zoneId
-        val dayStart = date.atStartOfDay(zoneId).toInstant()
-        val dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant()
-
-        val prices = energyPriceRepository.getPrices(
-            countryCode = countryCode,
-            start = dayStart,
-            end = dayEnd,
-            cacheResults = false
-        ).getOrThrow()
-        if (!prices.isFullDay(date, zoneId)) {
-            return null
-        }
-
+    private fun dailyStat(prices: List<DomainEnergyPrice>): DailyStatEntry {
         val pricesList = prices.map { it.pricePerKWh }
-        val entry = DailyStatEntry(
+        return DailyStatEntry(
             min = pricesList.min(),
             max = pricesList.max(),
             avg = prices.sumOf { it.pricePerKWh * it.durationSeconds } / prices.sumOf { it.durationSeconds },
@@ -71,6 +149,5 @@ class PriceStatsRepositoryImpl(
             count = pricesList.size,
             durationSeconds = prices.sumOf { it.durationSeconds }
         )
-        return date to entry
     }
 }
