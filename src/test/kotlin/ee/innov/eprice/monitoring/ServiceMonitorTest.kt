@@ -29,6 +29,9 @@ class ServiceMonitorTest {
         assertEquals(0L, stats.totalOutgoingRequests)
         assertEquals(0L, stats.outgoingEleringRequests)
         assertEquals(0L, stats.outgoingEntsoeRequests)
+        assertEquals(0L, stats.failedOutgoingRequests)
+        assertEquals(0L, stats.failedOutgoingEleringRequests)
+        assertEquals(0L, stats.failedOutgoingEntsoeRequests)
         assertEquals(0L, stats.cacheHits)
         assertEquals(0L, stats.cacheMisses)
         assertEquals(0.0, stats.cacheHitRatio)
@@ -64,6 +67,22 @@ class ServiceMonitorTest {
         assertEquals(5L, stats.totalOutgoingRequests)
         assertEquals(2L, stats.outgoingEleringRequests)
         assertEquals(1L, stats.outgoingEntsoeRequests)
+    }
+
+    @Test
+    fun `failed outgoing requests track providers without incrementing request totals`() {
+        val monitor = ServiceMonitor()
+        monitor.incrementFailedOutgoing("DASHBOARD.ELERING.EE")
+        monitor.incrementFailedOutgoing("dashboard.elering.ee")
+        monitor.incrementFailedOutgoing("WEB-API.TP.ENTSOE.EU")
+        monitor.incrementFailedOutgoing("other.service.com")
+        monitor.incrementFailedOutgoing()
+
+        val stats = monitor.getStats()
+        assertEquals(5L, stats.failedOutgoingRequests)
+        assertEquals(2L, stats.failedOutgoingEleringRequests)
+        assertEquals(1L, stats.failedOutgoingEntsoeRequests)
+        assertEquals(0L, stats.totalOutgoingRequests)
     }
 
     @Test

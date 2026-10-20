@@ -12,6 +12,9 @@ data class ServiceStats(
     val totalOutgoingRequests: Long,
     val outgoingEleringRequests: Long,
     val outgoingEntsoeRequests: Long,
+    val failedOutgoingRequests: Long,
+    val failedOutgoingEleringRequests: Long,
+    val failedOutgoingEntsoeRequests: Long,
     val cacheHits: Long,
     val cacheMisses: Long,
     val cacheHitRatio: Double,
@@ -28,6 +31,9 @@ class ServiceMonitor(val identity: ServiceIdentity = ServiceIdentity.load()) {
     private val outgoingCounter = AtomicLong(0)
     private val outgoingEleringCounter = AtomicLong(0)
     private val outgoingEntsoeCounter = AtomicLong(0)
+    private val failedOutgoingCounter = AtomicLong(0)
+    private val failedOutgoingEleringCounter = AtomicLong(0)
+    private val failedOutgoingEntsoeCounter = AtomicLong(0)
     private val cacheHitCounter = AtomicLong(0)
     private val cacheMissCounter = AtomicLong(0)
 
@@ -41,6 +47,16 @@ class ServiceMonitor(val identity: ServiceIdentity = ServiceIdentity.load()) {
             when {
                 host.contains("elering", ignoreCase = true) -> outgoingEleringCounter.incrementAndGet()
                 host.contains("entsoe", ignoreCase = true) -> outgoingEntsoeCounter.incrementAndGet()
+            }
+        }
+    }
+
+    fun incrementFailedOutgoing(host: String? = null) {
+        failedOutgoingCounter.incrementAndGet()
+        if (host != null) {
+            when {
+                host.contains("elering", ignoreCase = true) -> failedOutgoingEleringCounter.incrementAndGet()
+                host.contains("entsoe", ignoreCase = true) -> failedOutgoingEntsoeCounter.incrementAndGet()
             }
         }
     }
@@ -79,6 +95,9 @@ class ServiceMonitor(val identity: ServiceIdentity = ServiceIdentity.load()) {
             totalOutgoingRequests = outTotal,
             outgoingEleringRequests = outElering,
             outgoingEntsoeRequests = outEntsoe,
+            failedOutgoingRequests = failedOutgoingCounter.get(),
+            failedOutgoingEleringRequests = failedOutgoingEleringCounter.get(),
+            failedOutgoingEntsoeRequests = failedOutgoingEntsoeCounter.get(),
             cacheHits = hits,
             cacheMisses = misses,
             cacheHitRatio = hitRatio,
