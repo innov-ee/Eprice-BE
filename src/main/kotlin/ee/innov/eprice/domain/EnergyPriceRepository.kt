@@ -5,7 +5,8 @@ import java.time.Instant
 
 interface EnergyPriceRepository {
     /**
-     * Fetches energy prices for a given time range and country.
+     * Fetches energy prices for a country in [start, end), with an exclusive end.
+     * Returned intervals are clipped to the requested range and sorted chronologically.
      * Returns a Result containing a list of prices on success,
      * or an ApiError on failure.
      */

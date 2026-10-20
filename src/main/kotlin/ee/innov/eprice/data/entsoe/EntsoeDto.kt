@@ -5,7 +5,8 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import java.time.Instant
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
+import java.time.Duration
+import ee.innov.eprice.domain.model.InvalidPriceDataException
 
 // --- Data Models for XML Parsing ---
 
@@ -18,6 +19,10 @@ data class PublicationMarketDocument(
 data class TimeSeries(
     val mRID: String? = null,
     val curveType: String? = null,
+    @JsonProperty("currency_Unit.name")
+    val currency: String? = null,
+    @JsonProperty("price_Measure_Unit.name")
+    val priceUnit: String? = null,
     @JsonProperty("Period")
     @JacksonXmlElementWrapper(useWrapping = false)
     val period: List<Period> = emptyList()
@@ -38,151 +43,98 @@ data class TimeInterval(
 data class Point(
     val position: Int,
     @JsonProperty("price.amount")
-    val priceAmount: Double
+    val priceAmount: Double?
 )
 
-private fun parseResolutionMinutes(resolution: String): Long {
-    val trimmed = resolution.trim().uppercase()
-    return when {
-        trimmed == "PT1H" || trimmed == "PT60M" -> 60L
-        trimmed.startsWith("PT") && trimmed.endsWith("M") ->
-            trimmed.removePrefix("PT").removeSuffix("M").toLongOrNull() ?: 60L
-        trimmed.startsWith("PT") && trimmed.endsWith("H") ->
-            (trimmed.removePrefix("PT").removeSuffix("H").toLongOrNull() ?: 1L) * 60L
-        else -> 60L
+private fun checkPriceData(valid: Boolean, message: String) {
+    if (!valid) throw InvalidPriceDataException(message)
+}
+
+private fun parseResolutionSeconds(resolution: String): Long {
+    val duration = try { Duration.parse(resolution.trim().uppercase()) } catch (_: Exception) {
+        throw InvalidPriceDataException("Invalid price resolution: $resolution")
     }
+    checkPriceData(duration.seconds > 0 && duration.nano == 0 && duration.seconds % 60 == 0L,
+        "Price resolution must be a positive whole number of minutes: $resolution")
+    return duration.seconds
 }
 
 fun PublicationMarketDocument.toDomainEnergyPrices(): List<DomainEnergyPrice> {
-    return this.timeSeries.flatMap { timeSeries ->
-        timeSeries.period.flatMap { period ->
-            val resolutionMinutes = parseResolutionMinutes(period.resolution)
-            val periodStartInstant = Instant.from(
-                DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.start)
-            )
-
-            val sortedPoints = period.point.sortedBy { it.position }
-            if (sortedPoints.isEmpty()) {
-                emptyList()
-            } else {
-                val totalPositions = if (!period.timeInterval.end.isNullOrBlank()) {
-                    try {
-                        val periodEndInstant = Instant.from(
-                            DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(period.timeInterval.end)
-                        )
-                        val durationMinutes = java.time.Duration.between(periodStartInstant, periodEndInstant).toMinutes()
-                        (durationMinutes / resolutionMinutes).toInt()
-                    } catch (_: Exception) {
-                        sortedPoints.last().position
-                    }
-                } else {
-                    sortedPoints.last().position
-                }
-
-                val endPosition = maxOf(totalPositions, sortedPoints.last().position)
-                val pointMap = sortedPoints.associateBy { it.position }
-
-                var currentPriceAmount = sortedPoints.first().priceAmount
-                (1..endPosition).mapNotNull { pos ->
-                    pointMap[pos]?.let { point ->
-                        currentPriceAmount = point.priceAmount
-                    }
-
-                    if (pos < sortedPoints.first().position) {
-                        null
-                    } else {
-                        val pricePerKWh = currentPriceAmount / 1000.0
-                        val intervalStart = periodStartInstant.plus(
-                            (pos - 1) * resolutionMinutes,
-                            ChronoUnit.MINUTES
-                        )
-
-                        DomainEnergyPrice(
-                            startTime = intervalStart,
-                            pricePerKWh = pricePerKWh
-                        )
-                    }
-                }
-            }
-        }
-    }.distinctBy { it.startTime }.sortedBy { it.startTime }
+    return timeSeries.flatMap { series ->
+        series.validateCurrencyAndUnit()
+        val curve = series.validatedCurveType()
+        series.period.flatMap { it.toDomainEnergyPrices(curve) }
+    }.mergeIdenticalIntervals().sortedBy { it.startTime }
 }
 
-private val biddingZoneMap: Map<String, String> = mapOf(
-    // Baltics
-    "EE" to "10Y1001A1001A39I",
-    "FI" to "10YFI-1--------U",
-    "LT" to "10YLT-1001A0008Q",
-    "LV" to "10YLV-1001A00074",
+private fun TimeSeries.validateCurrencyAndUnit() {
+    checkPriceData(currency == "EUR", "Expected EUR prices, received ${currency ?: "no currency"}")
+    checkPriceData(priceUnit == "MWH", "Expected MWH price unit, received ${priceUnit ?: "no unit"}")
+}
 
-    // Nordics (Bidding Zones)
-    "SE1" to "10Y1001A1001A44P",
-    "SE2" to "10Y1001A1001A45N",
-    "SE3" to "10Y1001A1001A46L",
-    "SE4" to "10Y1001A1001A47J",
-    "NO1" to "10YNO-1--------2",
-    "NO2" to "10YNO-2--------T",
-    "NO3" to "10YNO-3--------J",
-    "NO4" to "10YNO-4--------9",
-    "NO5" to "10Y1001A1001A48H",
-    "DK1" to "10YDK-1--------W",
-    "DK2" to "10YDK-2--------M",
+private fun TimeSeries.validatedCurveType(): String {
+    val curve = curveType ?: "A01"
+    checkPriceData(curve == "A01" || curve == "A03", "Unsupported price curve: $curve")
+    return curve
+}
 
-    // Western & Central Europe
-    "DE" to "10Y1001A1001A82H",
-    "DE_LU" to "10Y1001A1001A82H",
-    "AT" to "10YAT-APG------L",
-    "BE" to "10YBE----------2",
-    "FR" to "10YFR-RTE------C",
-    "NL" to "10YNL----------L",
-    "CH" to "10YCH-SWISSGRIDZ",
-    "PL" to "10YPL-AREA-----S",
-    "CZ" to "10YCZ-CEPS-----N",
-    "SK" to "10YSK-SEPS-----K",
-    "HU" to "10YHU-MAVIR----U",
-    "SI" to "10YSI-ELES-----O",
-    "HR" to "10YHR-HEP------M",
-    "RO" to "10YRO-TEL------P",
-    "BG" to "10YCA-BULGARIA-R",
-    "GR" to "10YGR-HTSO-----Y",
-    "LU" to "10Y1001A1001A82H",
+private fun Period.toDomainEnergyPrices(curve: String): List<DomainEnergyPrice> {
+    val step = parseResolutionSeconds(resolution)
+    val start = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(timeInterval.start))
+    val points = point.sortedBy { it.position }
+    if (points.isEmpty()) return emptyList()
 
-    // Iberia
-    "ES" to "10YES-REE------0",
-    "PT" to "10YPT-REN------W",
+    val end = timeInterval.end?.let { Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(it)) }
+        ?: start.plusSeconds(points.last().position * step)
+    val count = validatedIntervalCount(start, end, step)
+    points.validatePositions(count)
+    points.validateFinitePrices()
+    val pointMap = points.mergeIdenticalPositions()
 
-    // British Isles
-    "GB" to "10YGB----------A",
-    "UK" to "10YGB----------A",
-    "IE" to "10Y1001A1001A59C",
-
-    // Italy (Bidding Zones)
-    "IT_NORD" to "10Y1001A1001A73I",
-    "IT_CNOR" to "10Y1001A1001A70O",
-    "IT_CSUD" to "10Y1001A1001A71M",
-    "IT_SUD" to "10Y1001A1001A788",
-    "IT_SICI" to "10Y1001A1001A75E",
-    "IT_SARD" to "10Y1001A1001A74G",
-    "IT_CALA" to "10Y1001C--00096J",
-
-    // Southeastern Europe & Non-EU
-    "RS" to "10YCS-SERBIATSOV",
-    "ME" to "10YCS-CG-TSO---S",
-    "MK" to "10YMK-MEPSO----8",
-    "AL" to "10YAL-KESH-----5",
-    "BA" to "10YBA-JPCC-----D",
-    "XK" to "10Y1001C--00100H",
-    "UA" to "10Y1001C--00003F",
-    "MD" to "10Y1001A1001A990"
-)
-
-/**
- * Maps a 2-letter country code or bidding zone name to its corresponding ENTSO-E Bidding Zone EIC code.
- * If the input is already a valid 16-character EIC code, it is returned directly.
- */
-internal fun String.toBiddingZone(): String? {
-    if (this.length == 16 && (this.startsWith("10Y") || this.startsWith("10X") || this.startsWith("10Z"))) {
-        return this
+    return if (curve == "A01") {
+        pointMap.values.mapExplicitPrices(start, step)
+    } else {
+        pointMap.expandSteppedPrices(start, step, count)
     }
-    return biddingZoneMap[this]
 }
+
+private fun validatedIntervalCount(start: Instant, end: Instant, step: Long): Long {
+    val seconds = Duration.between(start, end).seconds
+    checkPriceData(seconds > 0 && seconds % step == 0L, "Price period does not match its resolution")
+    return seconds / step
+}
+
+private fun List<Point>.validatePositions(count: Long) {
+    checkPriceData(all { it.position in 1..count }, "Price point lies outside its period")
+}
+
+private fun List<Point>.validateFinitePrices() {
+    checkPriceData(all { it.priceAmount == null || it.priceAmount.isFinite() }, "Price must be finite")
+}
+
+private fun List<Point>.mergeIdenticalPositions(): Map<Int, Point> =
+    groupBy { it.position }.mapValues { (_, duplicates) ->
+        checkPriceData(duplicates.map { it.priceAmount }.distinct().size == 1, "Conflicting prices for the same position")
+        duplicates.first()
+    }
+
+/** A01 supplies individual prices; missing positions remain gaps. */
+private fun Collection<Point>.mapExplicitPrices(start: Instant, step: Long): List<DomainEnergyPrice> =
+    mapNotNull { point ->
+        point.priceAmount?.let { DomainEnergyPrice(start.plusSeconds((point.position - 1) * step), it / 1000, step) }
+    }
+
+/** A03 prices carry forward until the next point; a null price clears the current value. */
+private fun Map<Int, Point>.expandSteppedPrices(start: Instant, step: Long, count: Long): List<DomainEnergyPrice> {
+    var amount: Double? = null
+    return (1..count).mapNotNull { position ->
+        this[position.toInt()]?.let { amount = it.priceAmount }
+        amount?.let { DomainEnergyPrice(start.plusSeconds((position - 1) * step), it / 1000, step) }
+    }
+}
+
+private fun List<DomainEnergyPrice>.mergeIdenticalIntervals(): List<DomainEnergyPrice> =
+    groupBy { it.startTime }.map { (_, duplicates) ->
+        checkPriceData(duplicates.distinct().size == 1, "Conflicting price series for the same UTC interval")
+        duplicates.first()
+    }

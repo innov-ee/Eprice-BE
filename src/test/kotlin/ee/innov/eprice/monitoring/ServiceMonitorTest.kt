@@ -7,6 +7,20 @@ import org.junit.jupiter.api.Test
 class ServiceMonitorTest {
 
     @Test
+    fun `identity and startup time remain stable across stats snapshots`() {
+        val identity = ServiceIdentity("a".repeat(40), "2026-10-14T10:30:00Z")
+        val monitor = ServiceMonitor(identity)
+        val before = monitor.getStats()
+        monitor.incrementIncoming()
+        val after = monitor.getStats()
+
+        assertEquals(identity, after.identity)
+        assertEquals(before.identity, after.identity)
+        assertEquals(before.startedAt, after.startedAt)
+        java.time.Instant.parse(after.startedAt)
+    }
+
+    @Test
     fun `initial stats should be zero`() {
         val monitor = ServiceMonitor()
         val stats = monitor.getStats()

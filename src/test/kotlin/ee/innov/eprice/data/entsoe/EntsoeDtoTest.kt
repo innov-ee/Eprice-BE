@@ -18,7 +18,7 @@ class EntsoeDtoTest {
     fun `toDomainEnergyPrices fills gaps in stepped A03 curve points`() {
         val xml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
                     <curveType>A03</curveType>
                     <Period>
                         <timeInterval>
@@ -79,31 +79,10 @@ class EntsoeDtoTest {
     }
 
     @Test
-    fun `toBiddingZone maps countries, subzones, and direct EIC codes correctly`() {
-        assertEquals("10Y1001A1001A39I", "EE".toBiddingZone())
-        assertEquals("10YFI-1--------U", "FI".toBiddingZone())
-        assertEquals("10Y1001A1001A82H", "DE".toBiddingZone())
-        assertEquals("10Y1001A1001A82H", "DE_LU".toBiddingZone())
-        assertEquals("10YFR-RTE------C", "FR".toBiddingZone())
-        assertEquals("10Y1001A1001A46L", "SE3".toBiddingZone())
-        assertEquals("10YNO-1--------2", "NO1".toBiddingZone())
-        assertEquals("10Y1001A1001A73I", "IT_NORD".toBiddingZone())
-        assertEquals("10Y1001A1001A75E", "IT_SICI".toBiddingZone())
-        assertEquals("10Y1001A1001A70O", "IT_CNOR".toBiddingZone())
-
-        // Direct 16-character EIC code pass-through
-        val directEic = "10Y1001A1001A82H"
-        assertEquals(directEic, directEic.toBiddingZone())
-
-        // Unknown code returns null
-        assertEquals(null, "INVALID_CODE".toBiddingZone())
-    }
-
-    @Test
     fun `toDomainEnergyPrices parses multiple time series correctly`() {
         val xml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name><curveType>A03</curveType>
                     <Period>
                         <timeInterval>
                             <start>2026-08-20T22:00Z</start>
@@ -116,7 +95,7 @@ class EntsoeDtoTest {
                         </Point>
                     </Period>
                 </TimeSeries>
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name><curveType>A03</curveType>
                     <Period>
                         <timeInterval>
                             <start>2026-08-21T22:00Z</start>
@@ -145,8 +124,8 @@ class EntsoeDtoTest {
     fun `toDomainEnergyPrices deduplicates overlapping time series for same interval`() {
         val xml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
-                    <mRID>1</mRID>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
+                    <curveType>A03</curveType><mRID>1</mRID>
                     <Period>
                         <timeInterval>
                             <start>2026-08-20T22:00Z</start>
@@ -159,8 +138,8 @@ class EntsoeDtoTest {
                         </Point>
                     </Period>
                 </TimeSeries>
-                <TimeSeries>
-                    <mRID>2</mRID>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
+                    <curveType>A03</curveType><mRID>2</mRID>
                     <Period>
                         <timeInterval>
                             <start>2026-08-20T22:00Z</start>

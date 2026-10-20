@@ -44,6 +44,7 @@ jobs:
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}:$GITHUB_SHA"
           echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: Build and push image
         uses: docker/build-push-action@v7
         with:
@@ -53,6 +54,9 @@ jobs:
           tags: ${{ steps.image.outputs.image }}
           cache-from: type=gha # using cache of github actions
           cache-to: type=gha,mode=max
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.image.outputs.built_at }}
       # Step to skip ACC deploy if a new commit been pushed meanwhile
       # Sets `outputs.current` which `Deploy to acc` uses do decide if it should run
       - name: Skip a stale main commit

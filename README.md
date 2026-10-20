@@ -13,8 +13,7 @@
 - monitor dashboard: http://localhost:8080/monitor.html
 - raw monitor status: http://localhost:8080/monitor
 - prices (EE): http://localhost:8080/api/prices
-- price stats: http://localhost:8080/api/prices/EE/stats 
-- yesterday stats: http://localhost:8080/api/prices/EE/stats?range=yesterday
+- price summary: http://localhost:8080/api/prices/EE/stats/summary
 ---
 
 ## Big picture

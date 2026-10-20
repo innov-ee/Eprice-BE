@@ -12,3 +12,8 @@ local.properties
 
 # Ignore OS-specific files
 .DS_Store
+
+# Local runtime price caches
+eprice-cache*.json*
+daily-average-cache*.json*
+daily-stats-cache*.json*

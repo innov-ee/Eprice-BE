@@ -2,6 +2,8 @@ package ee.innov.eprice.data.entsoe
 
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import ee.innov.eprice.domain.model.EntsoeApiException
+import ee.innov.eprice.domain.model.DomainEnergyPrice
+import ee.innov.eprice.domain.model.inRange
 import ee.innov.eprice.domain.model.NoDataFoundException
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -26,7 +28,7 @@ class EntsoeService(
         .withZone(ZoneOffset.UTC)
 
     /**
-     * Fetches the raw XML data and parses it.
+     * Fetches, validates and maps ENTSO-E prices within [start, end).
      * @param biddingZone The ENTSO-E bidding zone identifier.
      * @throws EntsoeApiException if the API key is missing or the API returns an error.
      * @throws NoDataFoundException if the API returns a "no data" message.
@@ -37,7 +39,7 @@ class EntsoeService(
         biddingZone: String,
         start: Instant,
         end: Instant
-    ): PublicationMarketDocument {
+    ): List<DomainEnergyPrice> {
         if (apiKey.isBlank()) {
             throw EntsoeApiException(500, "ENTSOE_API_KEY is not set.")
         }
@@ -98,9 +100,11 @@ class EntsoeService(
             )
         }
 
-        return xmlMapper.readValue(
+        val marketDocument = xmlMapper.readValue(
             trimmed,
             PublicationMarketDocument::class.java
         )
+        // ENTSO-E may return whole publication days beyond the requested range.
+        return marketDocument.toDomainEnergyPrices().inRange(start, end)
     }
 }

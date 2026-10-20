@@ -3,10 +3,8 @@ package ee.innov.eprice.di
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import ee.innov.eprice.data.DailyAveragePriceCache
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.EnergyPriceRepositoryImpl
-import ee.innov.eprice.data.FileBackedDailyAveragePriceCache
 import ee.innov.eprice.data.FileBackedDailyStatsCache
 import ee.innov.eprice.data.InMemoryPriceCache
 import ee.innov.eprice.data.PriceCache
@@ -15,21 +13,22 @@ import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
-import ee.innov.eprice.domain.GetPriceStatisticsUseCase
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
-import ee.innov.eprice.domain.GetRollingAveragePriceUseCase
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
+import ee.innov.eprice.monitoring.ServiceLogs
 import ee.innov.eprice.security.KeyRotationService
 import ee.innov.eprice.util.getEnv
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.api.SendingRequest
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.http.HttpHeaders
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
@@ -49,6 +48,7 @@ private fun resolveCachePath(fileName: String): Path {
 val appModule = module {
 
     single { ServiceMonitor() }
+    single { ServiceLogs() }
 
     single { KeyRotationService() }
 
@@ -77,6 +77,13 @@ val appModule = module {
             install(createClientPlugin("OutgoingMonitor") {
                 onRequest { request, _ ->
                     monitor.incrementOutgoing(request.url.host)
+                }
+            })
+
+            install(createClientPlugin("RequestHeaders") {
+                on(SendingRequest) { request, _ ->
+                    // Ktor adds this deprecated header automatically; some upstream gateways (entsoe) reject it.
+                    request.headers.remove(HttpHeaders.AcceptCharset)
                 }
             })
 
@@ -115,15 +122,11 @@ val appModule = module {
     }
 
     single<PriceCache> {
-        InMemoryPriceCache(cacheFile = resolveCachePath("eprice-cache.json"))
-    }
-
-    single<DailyAveragePriceCache> {
-        FileBackedDailyAveragePriceCache(cacheFile = resolveCachePath("daily-average-cache.json"))
+        InMemoryPriceCache(cacheFile = resolveCachePath("eprice-cache-v2.json"))
     }
 
     single<DailyStatsCache> {
-        FileBackedDailyStatsCache(cacheFile = resolveCachePath("daily-stats-cache.json"))
+        FileBackedDailyStatsCache(cacheFile = resolveCachePath("daily-stats-cache-v2.json"))
     }
 
     single<EnergyPriceRepository> {
@@ -144,20 +147,6 @@ val appModule = module {
     }
 
     factory { GetEnergyPricesUseCase(energyPriceRepository = get()) }
-
-    factory {
-        GetRollingAveragePriceUseCase(
-            energyPriceRepository = get(),
-            dailyAveragePriceCache = get(),
-            monitor = get()
-        )
-    }
-
-    factory {
-        GetPriceStatisticsUseCase(
-            priceStatsRepository = get()
-        )
-    }
 
     factory {
         GetPriceSummaryUseCase(

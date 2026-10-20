@@ -1,14 +1,12 @@
 package ee.innov.eprice.data
 
-import ee.innov.eprice.domain.CountryZoneProvider
+import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.isFullDay
 import ee.innov.eprice.monitoring.ServiceMonitor
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -23,12 +21,10 @@ class PriceStatsRepositoryImpl(
         startDate: LocalDate,
         endDate: LocalDate
     ): Result<Map<LocalDate, DailyStatEntry>> {
-        val zoneId = CountryZoneProvider.getZoneId(countryCode)
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
         val datesInRange = (0 until totalDays).map { startDate.plusDays(it.toLong()) }
 
         val cachedStats = dailyStatsCache.getRange(countryCode, startDate, endDate)
-            .filter { (date, entry) -> entry.isFullDay(date, zoneId) }
         val missingDates = datesInRange.filter { !cachedStats.containsKey(it) }
 
         monitor?.recordCacheHit(cachedStats.size.toLong())
@@ -39,35 +35,29 @@ class PriceStatsRepositoryImpl(
         }
 
         val fetchedStats = try {
-            coroutineScope {
-                val deferredResults = missingDates.map { date ->
-                    async { fetchDailyStat(countryCode, date) }
-                }
-                deferredResults.awaitAll().filterNotNull().toMap()
-            }
+            missingDates.mapNotNull { date -> fetchDailyStat(countryCode, date) }.toMap()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return Result.failure(e)
         }
 
-        if (fetchedStats.isNotEmpty()) {
-            dailyStatsCache.putBatch(countryCode, fetchedStats)
-        }
+        dailyStatsCache.putBatch(countryCode, fetchedStats)
 
         return Result.success(cachedStats + fetchedStats)
     }
 
     private suspend fun fetchDailyStat(countryCode: String, date: LocalDate): Pair<LocalDate, DailyStatEntry>? {
-        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val zoneId = BiddingZones.resolve(countryCode).zoneId
         val dayStart = date.atStartOfDay(zoneId).toInstant()
-        val dayEnd = date.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant()
 
         val prices = energyPriceRepository.getPrices(
             countryCode = countryCode,
             start = dayStart,
             end = dayEnd,
             cacheResults = false
-        ).getOrNull()?.takeIf { it.isNotEmpty() } ?: return null
-
+        ).getOrThrow()
         if (!prices.isFullDay(date, zoneId)) {
             return null
         }
@@ -76,9 +66,10 @@ class PriceStatsRepositoryImpl(
         val entry = DailyStatEntry(
             min = pricesList.min(),
             max = pricesList.max(),
-            avg = pricesList.average(),
+            avg = prices.sumOf { it.pricePerKWh * it.durationSeconds } / prices.sumOf { it.durationSeconds },
             sum = pricesList.sum(),
-            count = pricesList.size
+            count = pricesList.size,
+            durationSeconds = prices.sumOf { it.durationSeconds }
         )
         return date to entry
     }

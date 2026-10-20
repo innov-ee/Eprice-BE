@@ -16,14 +16,14 @@ class GetEnergyPricesUseCase(
      * @return A Result containing the list of prices or an error.
      */
     suspend fun execute(countryCode: String): Result<List<DomainEnergyPrice>> {
-        val zoneId = CountryZoneProvider.getZoneId(countryCode)
+        val zoneId = BiddingZones.resolve(countryCode).zoneId
         val today = LocalDate.now(clock.withZone(zoneId))
 
         // Business logic: Set periodStart to the beginning of yesterday in the country's local timezone
         val start = today.minusDays(1).atStartOfDay(zoneId).toInstant()
 
         // Business logic: Set periodEnd to the end of tomorrow in the country's local timezone
-        val end = today.plusDays(2).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = today.plusDays(2).atStartOfDay(zoneId).toInstant()
 
         return energyPriceRepository.getPrices(countryCode, start, end)
     }

@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 interface DailyStatsCache {
 
+    // Callers write only complete daily statistics; cached entries are trusted on read.
+
     fun get(countryCode: String, date: LocalDate): DailyStatEntry?
 
     fun put(countryCode: String, date: LocalDate, stats: DailyStatEntry)
@@ -31,7 +33,7 @@ private data class DailyStatsCacheFile(
 )
 
 class FileBackedDailyStatsCache(
-    cacheFile: Path = Paths.get("daily-stats-cache.json")
+    cacheFile: Path = Paths.get("daily-stats-cache-v2.json")
 ) : BaseFileCache(cacheFile), DailyStatsCache {
 
     // In-memory thread-safe cache

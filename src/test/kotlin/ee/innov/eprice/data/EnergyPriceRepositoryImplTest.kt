@@ -5,7 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import ee.innov.eprice.data.elering.EleringService
 import ee.innov.eprice.data.entsoe.EntsoeService
-import ee.innov.eprice.domain.CountryZoneProvider
+import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.monitoring.ServiceMonitor
 import io.ktor.client.HttpClient
@@ -69,20 +69,20 @@ class EnergyPriceRepositoryImplTest {
     @Test
     fun `getPrices caches complete dataset indefinitely`() = runBlocking<Unit> {
         val networkCallCount = AtomicInteger(0)
-        val zoneId = CountryZoneProvider.getZoneId("EE")
+        val zoneId = BiddingZones.resolve("EE").zoneId
         val d1 = LocalDate.of(2026, 8, 22)
         val d2 = LocalDate.of(2026, 8, 23)
         val d3 = LocalDate.of(2026, 8, 24)
 
         val start = d1.atStartOfDay(zoneId).toInstant()
-        val end = d3.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = d3.plusDays(1).atStartOfDay(zoneId).toInstant()
 
-        // Generate complete 24h data for each day (72 hours total)
+        // Generate complete quarter-hourly data for each day (288 intervals total)
         val allPoints = mutableListOf<Pair<Long, Double>>()
         listOf(d1, d2, d3).forEach { d ->
             val dayStart = d.atStartOfDay(zoneId).toInstant()
-            (0 until 24).forEach { h ->
-                val epochSec = dayStart.plusSeconds(h * 3600L).epochSecond
+            (0 until 96).forEach { h ->
+                val epochSec = dayStart.plusSeconds(h * 900L).epochSecond
                 allPoints.add(epochSec to 100.0)
             }
         }
@@ -117,7 +117,7 @@ class EnergyPriceRepositoryImplTest {
         // First call - cold cache, fetches from network
         val firstResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(firstResult.isSuccess)
-        assertEquals(72, firstResult.getOrThrow().size)
+        assertEquals(288, firstResult.getOrThrow().size)
         assertEquals(1, networkCallCount.get())
         assertEquals(1, recordingCache.putInvocations.size)
         assertTrue(recordingCache.putInvocations[0].isComplete, "Complete 3-day data should be marked isComplete=true")
@@ -125,32 +125,32 @@ class EnergyPriceRepositoryImplTest {
         // Second call - warm cache, served from cache with zero network calls
         val secondResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(secondResult.isSuccess)
-        assertEquals(72, secondResult.getOrThrow().size)
+        assertEquals(288, secondResult.getOrThrow().size)
         assertEquals(1, networkCallCount.get(), "Network should not be called again on cache hit")
     }
 
     @Test
     fun `getPrices caches incomplete dataset with temporary TTL to throttle upstream requests`() = runBlocking<Unit> {
         val networkCallCount = AtomicInteger(0)
-        val zoneId = CountryZoneProvider.getZoneId("EE")
+        val zoneId = BiddingZones.resolve("EE").zoneId
         val d1 = LocalDate.of(2026, 8, 22)
         val d2 = LocalDate.of(2026, 8, 23)
         val d3 = LocalDate.of(2026, 8, 24)
 
         val start = d1.atStartOfDay(zoneId).toInstant()
-        val end = d3.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = d3.plusDays(1).atStartOfDay(zoneId).toInstant()
 
         // Day 1 & 2 complete, Day 3 only has 2 hours (incomplete tomorrow)
         val points = mutableListOf<Pair<Long, Double>>()
         listOf(d1, d2).forEach { d ->
             val dayStart = d.atStartOfDay(zoneId).toInstant()
-            (0 until 24).forEach { h ->
-                points.add(dayStart.plusSeconds(h * 3600L).epochSecond to 100.0)
+            (0 until 96).forEach { h ->
+                points.add(dayStart.plusSeconds(h * 900L).epochSecond to 100.0)
             }
         }
         val day3Start = d3.atStartOfDay(zoneId).toInstant()
-        (0 until 2).forEach { h ->
-            points.add(day3Start.plusSeconds(h * 3600L).epochSecond to 100.0)
+        (0 until 8).forEach { h ->
+            points.add(day3Start.plusSeconds(h * 900L).epochSecond to 100.0)
         }
 
         val eleringJson = createEleringResponseJson(points)
@@ -181,7 +181,7 @@ class EnergyPriceRepositoryImplTest {
         // First call - cold cache
         val firstResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(firstResult.isSuccess)
-        assertEquals(50, firstResult.getOrThrow().size)
+        assertEquals(200, firstResult.getOrThrow().size)
         assertEquals(1, networkCallCount.get())
         assertEquals(1, recordingCache.putInvocations.size)
         assertFalse(recordingCache.putInvocations[0].isComplete, "Incomplete data should be marked isComplete=false")
@@ -189,7 +189,7 @@ class EnergyPriceRepositoryImplTest {
         // Second call immediately - should hit cache within TTL window (throttled, no upstream spam)
         val secondResult = repository.getPrices("EE", start, end, cacheResults = true)
         assertTrue(secondResult.isSuccess)
-        assertEquals(50, secondResult.getOrThrow().size)
+        assertEquals(200, secondResult.getOrThrow().size)
         assertEquals(1, networkCallCount.get(), "Should hit cache and not spam upstream while within TTL")
 
         // Wait for TTL to expire
@@ -204,14 +204,14 @@ class EnergyPriceRepositoryImplTest {
     @Test
     fun `getPrices for non-Baltic country queries ENTSO-E directly bypassing Elering`() = runBlocking<Unit> {
         val requestedUrls = mutableListOf<String>()
-        val zoneId = CountryZoneProvider.getZoneId("DE")
+        val zoneId = BiddingZones.resolve("DE_LU").zoneId
         val d1 = LocalDate.of(2026, 8, 22)
         val start = d1.atStartOfDay(zoneId).toInstant()
-        val end = d1.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = d1.plusDays(1).atStartOfDay(zoneId).toInstant()
 
         val entsoeXml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
                     <Period>
                         <timeInterval>
                             <start>2026-08-21T22:00Z</start>
@@ -249,7 +249,7 @@ class EnergyPriceRepositoryImplTest {
             cache = inMemoryCache
         )
 
-        val result = repository.getPrices("DE", start, end, cacheResults = true)
+        val result = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result.isSuccess)
         assertEquals(24, result.getOrThrow().size)
 
@@ -262,14 +262,14 @@ class EnergyPriceRepositoryImplTest {
     @Test
     fun `getPrices caches data and reuses cache across subsequent calls`() = runBlocking<Unit> {
         var networkCallCount = 0
-        val zoneId = CountryZoneProvider.getZoneId("DE")
+        val zoneId = BiddingZones.resolve("DE_LU").zoneId
         val d1 = LocalDate.of(2026, 8, 22)
         val start = d1.atStartOfDay(zoneId).toInstant()
-        val end = d1.plusDays(1).atStartOfDay(zoneId).minusSeconds(1).toInstant()
+        val end = d1.plusDays(1).atStartOfDay(zoneId).toInstant()
 
         val entsoeXml = """
             <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
-                <TimeSeries>
+                <TimeSeries><currency_Unit.name>EUR</currency_Unit.name><price_Measure_Unit.name>MWH</price_Measure_Unit.name>
                     <Period>
                         <timeInterval>
                             <start>2026-08-21T22:00Z</start>
@@ -307,24 +307,24 @@ class EnergyPriceRepositoryImplTest {
             cache = inMemoryCache
         )
 
-        // First call with "DE"
-        val result1 = repository.getPrices("DE", start, end, cacheResults = true)
+        // First call with "DE_LU"
+        val result1 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result1.isSuccess)
         assertEquals(1, networkCallCount)
 
-        // Second call with "DE" should hit cache
-        val result2 = repository.getPrices("DE", start, end, cacheResults = true)
+        // Second call with "DE_LU" should hit cache
+        val result2 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result2.isSuccess)
         assertEquals(1, networkCallCount)
 
-        // Third call with new country code "DE_LU" fetches from network
+        // Canonical aliases share the same cache entry.
         val result3 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result3.isSuccess)
-        assertEquals(2, networkCallCount)
+        assertEquals(1, networkCallCount)
 
         // Fourth call with "DE_LU" should hit cache
         val result4 = repository.getPrices("DE_LU", start, end, cacheResults = true)
         assertTrue(result4.isSuccess)
-        assertEquals(2, networkCallCount)
+        assertEquals(1, networkCallCount)
     }
 }

@@ -5,6 +5,11 @@ WORKDIR /home/gradle/src
 # Copy the *entire* project in first
 COPY . .
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+# Creates file with metadata inside the image that monitor.html will later display
+RUN printf 'commit=%s\nbuiltAt=%s\n' "$GIT_COMMIT" "$BUILD_TIME" > src/main/resources/build-info.properties
+
 # Run the 'buildFatJar' task explicitly to create the '-all.jar'
 RUN chmod +x ./gradlew && ./gradlew buildFatJar -x test --no-daemon
 

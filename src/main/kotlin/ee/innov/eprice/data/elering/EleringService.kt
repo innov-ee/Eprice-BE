@@ -1,6 +1,8 @@
 package ee.innov.eprice.data.elering
 
 import ee.innov.eprice.domain.model.EleringApiException
+import ee.innov.eprice.domain.model.DomainEnergyPrice
+import ee.innov.eprice.domain.model.inRange
 import ee.innov.eprice.domain.model.NoDataFoundException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -26,7 +28,7 @@ class EleringService(
     private val formatter = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC)
 
     /**
-     * Fetches prices from Elering.
+     * Fetches, validates and maps Elering prices within [start, end).
      * @param countryCode The 2-letter country code (e.g., "EE", "FI") to extract from the response.
      * @throws EleringApiException if the API returns an error.
      * @throws NoDataFoundException if the API returns no data for the specified country.
@@ -37,7 +39,7 @@ class EleringService(
         countryCode: String,
         start: Instant,
         end: Instant
-    ): EleringPriceResponse {
+    ): List<DomainEnergyPrice> {
         val periodStart = formatter.format(start)
         val periodEnd = formatter.format(end)
 
@@ -63,6 +65,6 @@ class EleringService(
             )
         }
 
-        return priceResponse
+        return priceResponse.toDomainEnergyPrices(countryCode).inRange(start, end)
     }
 }

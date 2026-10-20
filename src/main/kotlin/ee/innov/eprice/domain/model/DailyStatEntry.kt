@@ -1,7 +1,7 @@
 package ee.innov.eprice.domain.model
 
-import ee.innov.eprice.domain.CountryZoneProvider
 import kotlinx.serialization.Serializable
+import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -11,12 +11,15 @@ data class DailyStatEntry(
     val max: Double,
     val avg: Double,
     val sum: Double,
-    val count: Int
+    val count: Int,
+    val durationSeconds: Long = count * 3600L
 ) {
     /**
-     * Checks if this stat entry has enough data points to represent a full day in the given timezone.
+     * Checks whether the entry covers the actual local day, including DST transitions.
      */
     fun isFullDay(date: LocalDate, zoneId: ZoneId): Boolean {
-        return count >= CountryZoneProvider.getExpectedHoursForDay(date, zoneId)
+        val start = date.atStartOfDay(zoneId)
+        val end = date.plusDays(1).atStartOfDay(zoneId)
+        return durationSeconds == Duration.between(start, end).seconds
     }
 }
