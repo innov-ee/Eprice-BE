@@ -46,7 +46,9 @@ class EnergyPriceRepositoryImpl(
             monitor?.recordCacheMiss()
         }
 
-        val networkResult = fetchFromNetwork(region, start, end)
+        // Stats fills bypass price-cache writes and need fallback for each empty day.
+        // Price requests can serve and cache a partial Elering response as before.
+        val networkResult = fetchFromNetwork(region, start, end, fillDayGaps = !cacheResults)
 
         if (cacheResults) {
             networkResult.onSuccess { prices ->
@@ -68,7 +70,8 @@ class EnergyPriceRepositoryImpl(
     private suspend fun fetchFromNetwork(
         region: BiddingZone,
         start: Instant,
-        end: Instant
+        end: Instant,
+        fillDayGaps: Boolean
     ): Result<List<DomainEnergyPrice>> {
         // Strategy: Try Elering first if supported.
         if (region.eleringKey != null) {
@@ -84,7 +87,7 @@ class EnergyPriceRepositoryImpl(
                 emptyList()
             }
             if (prices.isNotEmpty()) {
-                return fillEmptyDays(region, start, end, prices)
+                return if (fillDayGaps) fillEmptyDays(region, start, end, prices) else Result.success(prices)
             }
         }
 

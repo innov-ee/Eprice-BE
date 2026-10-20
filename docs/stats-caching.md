@@ -20,4 +20,4 @@ Provider failures, timeouts, and malformed responses remain failed results and d
 
 Within one application instance, statistics requests share one active fill per region. Requests covered by that fill share its result; overlapping requests wait and then recheck cached days and cooldowns before deciding whether their full window needs a refresh. Different regions run independently. Caller cancellation stops only that caller's wait. The repository's worker scope is cancelled when its Koin singleton closes. Coordination does not extend across application replicas.
 
-This policy applies to statistics. Price endpoint caching and HTTP transport retries are configured separately.
+This policy applies to statistics. Price requests return and cache available Elering data without attempting to fill empty days through ENTSO-E. If Elering returns no data or fails, price requests still fall back to ENTSO-E for the requested range. Price endpoint caching and HTTP transport retries are configured separately.

@@ -52,6 +52,8 @@ class PriceStatsRepositoryImpl(
         endDate: LocalDate
     ): Result<Map<LocalDate, DailyStatEntry>> {
         while (true) {
+            // Cache-only requests must not wait for, or inherit failures from, another range's fill.
+            cachedStatsIfNotDue(countryCode, startDate, endDate)?.let { return Result.success(it) }
             // One fill per region. Other regions remain independent. Never suspend under this lock.
             val pending = synchronized(inFlight) {
                 inFlight[countryCode] ?: run {
@@ -80,6 +82,25 @@ class PriceStatsRepositoryImpl(
 
     override fun close() {
         fetchScope.cancel()
+    }
+
+    private fun cachedStatsIfNotDue(
+        countryCode: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Map<LocalDate, DailyStatEntry>? {
+        val cachedStats = dailyStatsCache.getRange(countryCode, startDate, endDate)
+        val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
+        val now = clock.instant()
+        val needsRefresh = (0 until totalDays).any { offset ->
+            val date = startDate.plusDays(offset.toLong())
+            date !in cachedStats && dailyStatsCache.getMissing(countryCode, date)?.nextCheckAt?.isAfter(now) != true
+        }
+        if (needsRefresh) return null
+
+        monitor?.recordCacheHit(cachedStats.size.toLong())
+        monitor?.recordCacheMiss((totalDays - cachedStats.size).toLong())
+        return cachedStats
     }
 
     private suspend fun loadDailyStats(

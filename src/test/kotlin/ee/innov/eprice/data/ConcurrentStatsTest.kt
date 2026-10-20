@@ -14,6 +14,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.time.Clock
+import java.time.ZoneOffset
 import java.time.Instant
 import java.time.LocalDate
 import java.util.concurrent.CopyOnWriteArrayList
@@ -24,6 +26,36 @@ import kotlin.test.assertTrue
 
 class ConcurrentStatsTest {
     private val first = LocalDate.of(2026, 8, 1)
+
+    @Test
+    fun `cached and cooling subsets return without waiting for a failing larger fill`() = runBlocking {
+        withTimeout(5000) {
+            val now = Instant.parse("2026-10-20T08:00:00Z")
+            val cache = InMemoryDailyStatsCache()
+            val saved = DailyStatEntry(0.1, 0.1, 0.1, 2.4, 24)
+            cache.put("IE", first, saved)
+            val coolingDay = first.plusDays(1)
+            cache.putMissingBatch("IE", mapOf(coolingDay to StatsRefreshPolicy().missing(
+                coolingDay, BiddingZones.resolve("IE").zoneId, now, null, MissingStatsReason.NO_DATA
+            )))
+            val prices = GatedPrices().apply { failure = IllegalStateException("Provider failed") }
+            PriceStatsRepositoryImpl(prices, cache, clock = Clock.fixed(now, ZoneOffset.UTC)).use { repository ->
+                val larger = async { repository.getDailyStats("IE", first, first.plusDays(2)) }
+                prices.entered.await()
+                try {
+                    assertEquals(mapOf(first to saved), repository.getDailyStats("IE", first, first).getOrThrow())
+                    assertEquals(mapOf(first to saved), repository.getDailyStats("IE", first, coolingDay).getOrThrow())
+                    assertTrue(repository.getDailyStats("IE", coolingDay, coolingDay).getOrThrow().isEmpty())
+                    assertFalse(larger.isCompleted)
+                } finally {
+                    prices.release.complete(Unit)
+                }
+                assertSame(prices.failure, larger.await().exceptionOrNull())
+                assertEquals(mapOf(first to saved), repository.getDailyStats("IE", first, coolingDay).getOrThrow())
+                assertEquals(1, prices.requests.size)
+            }
+        }
+    }
 
     private class GatedPrices : EnergyPriceRepository {
         val entered = CompletableDeferred<Unit>()
