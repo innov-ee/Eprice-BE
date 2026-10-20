@@ -23,10 +23,12 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.api.SendingRequest
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.http.HttpHeaders
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
@@ -75,6 +77,13 @@ val appModule = module {
             install(createClientPlugin("OutgoingMonitor") {
                 onRequest { request, _ ->
                     monitor.incrementOutgoing(request.url.host)
+                }
+            })
+
+            install(createClientPlugin("RequestHeaders") {
+                on(SendingRequest) { request, _ ->
+                    // Ktor adds this deprecated header automatically; some upstream gateways (entsoe) reject it.
+                    request.headers.remove(HttpHeaders.AcceptCharset)
                 }
             })
 
