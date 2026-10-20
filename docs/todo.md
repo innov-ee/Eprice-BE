@@ -1,6 +1,7 @@
 # TODO
 - Requests for tomorrows prices/stats can miss cache before noon, and this means they fall thru to actual requests every time - undesired, improve!
 - Stats requests in ranges where data is missing always trigger outgoing requests - undesired, improve!
+- For each region also list currency
 
 # Nice to have
 - Consider removing Result wrappers
@@ -15,7 +16,3 @@
 # Nits
 - Logging sometimes happens twice per request: in UseCase and Routes
 - Move admin panel also behind stricter rate limiting
-
-# Pre live
-- [x] Remove GET endpoint for clearing cache
-- [x] Make API only accessible to the app.

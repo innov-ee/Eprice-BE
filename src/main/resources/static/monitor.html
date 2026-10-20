@@ -738,12 +738,17 @@
                 <div class="stat-box">
                     <div class="stat-label">Outgoing: Elering</div>
                     <div class="stat-value" id="statOutgoingElering">--</div>
-                    <div class="stat-subtext">dashboard.elering.ee</div>
+                    <div class="stat-subtext" id="statOutgoingEleringFailed">0 failed</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Outgoing: ENTSO-E</div>
                     <div class="stat-value" id="statOutgoingEntsoe">--</div>
-                    <div class="stat-subtext">web-api.tp.entsoe.eu</div>
+                    <div class="stat-subtext" id="statOutgoingEntsoeFailed">0 failed</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Failed Outgoing Requests</div>
+                    <div class="stat-value" id="statOutgoingFailed">--</div>
+                    <div class="stat-subtext">HTTP 4xx/5xx or transport errors after retries</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Cache Hit Rate</div>
@@ -1008,6 +1013,9 @@
                     document.getElementById("statOutgoingTotal").textContent = `${outTotal} total upstream`;
                     document.getElementById("statOutgoingElering").textContent = Number(stats.outgoingEleringRequests || 0).toLocaleString();
                     document.getElementById("statOutgoingEntsoe").textContent = Number(stats.outgoingEntsoeRequests || 0).toLocaleString();
+                    document.getElementById("statOutgoingFailed").textContent = Number(stats.failedOutgoingRequests || 0).toLocaleString();
+                    document.getElementById("statOutgoingEleringFailed").textContent = `${Number(stats.failedOutgoingEleringRequests || 0).toLocaleString()} failed`;
+                    document.getElementById("statOutgoingEntsoeFailed").textContent = `${Number(stats.failedOutgoingEntsoeRequests || 0).toLocaleString()} failed`;
 
                     const hits = Number(stats.cacheHits || 0);
                     const misses = Number(stats.cacheMisses || 0);

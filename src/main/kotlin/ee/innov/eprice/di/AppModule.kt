@@ -17,6 +17,7 @@ import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.PriceStatsRepository
 import ee.innov.eprice.monitoring.ServiceMonitor
 import ee.innov.eprice.monitoring.ServiceLogs
+import ee.innov.eprice.monitoring.outgoingMonitor
 import ee.innov.eprice.security.KeyRotationService
 import ee.innov.eprice.util.getEnv
 import io.ktor.client.HttpClient
@@ -68,17 +69,13 @@ val appModule = module {
                 socketTimeoutMillis = 30_000
             }
 
+            install(outgoingMonitor(monitor))
+
             install(HttpRequestRetry) {
                 retryOnServerErrors(maxRetries = 3)
                 retryOnException(maxRetries = 3, retryOnTimeout = true)
                 exponentialDelay()
             }
-
-            install(createClientPlugin("OutgoingMonitor") {
-                onRequest { request, _ ->
-                    monitor.incrementOutgoing(request.url.host)
-                }
-            })
 
             install(createClientPlugin("RequestHeaders") {
                 on(SendingRequest) { request, _ ->

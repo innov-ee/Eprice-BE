@@ -5,6 +5,7 @@ import ee.innov.eprice.data.PriceCache
 import ee.innov.eprice.di.appModule
 import ee.innov.eprice.domain.GetEnergyPricesUseCase
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
+import ee.innov.eprice.monitoring.outgoingMonitor
 import ee.innov.eprice.security.KeyRotationService
 import ee.innov.eprice.test.NoOpDailyStatsCache
 import ee.innov.eprice.test.NoOpPriceCache
@@ -12,7 +13,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
-import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
@@ -279,6 +279,28 @@ class ApplicationTest {
     }
 
     @Test
+    fun `GET monitor exposes failed upstream requests`() {
+        runPriceApiTest(
+            engineHandler = createMockEngineHandler(
+                eleringContent = "Unavailable",
+                eleringStatus = HttpStatusCode.ServiceUnavailable,
+                entsoeContent = "Unavailable",
+                entsoeStatus = HttpStatusCode.ServiceUnavailable
+            ),
+            testBlock = { client ->
+                client.get("/api/prices")
+                val response = client.get("/monitor")
+
+                assertEquals(HttpStatusCode.OK, response.status)
+                val body = response.bodyAsText()
+                assertTrue(body.contains(""""failedOutgoingRequests":2"""), body)
+                assertTrue(body.contains(""""failedOutgoingEleringRequests":1"""))
+                assertTrue(body.contains(""""failedOutgoingEntsoeRequests":1"""))
+            }
+        )
+    }
+
+    @Test
     fun `GET monitor should return 200 OK with service stats`() {
         runPriceApiTest(
             engineHandler = createMockEngineHandler(
@@ -300,6 +322,9 @@ class ApplicationTest {
                 assertTrue(body.contains(""""totalOutgoingRequests":1""")) // Elering call
                 assertTrue(body.contains(""""outgoingEleringRequests":1"""))
                 assertTrue(body.contains(""""outgoingEntsoeRequests":0"""))
+                assertTrue(body.contains(""""failedOutgoingRequests":0"""))
+                assertTrue(body.contains(""""failedOutgoingEleringRequests":0"""))
+                assertTrue(body.contains(""""failedOutgoingEntsoeRequests":0"""))
                 assertTrue(body.contains(""""cacheHits":0"""))
                 assertTrue(body.contains(""""cacheMisses":1"""))
                 assertTrue(body.contains(""""cacheHitRatio":0.0"""))
@@ -618,11 +643,7 @@ class ApplicationTest {
             single {
                 val monitor = get<ee.innov.eprice.monitoring.ServiceMonitor>()
                 HttpClient(mockEngine) {
-                    install(createClientPlugin("OutgoingMonitor") {
-                        onRequest { request, _ ->
-                            monitor.incrementOutgoing(request.url.host)
-                        }
-                    })
+                    install(outgoingMonitor(monitor))
                 }
             } // Override the real HttpClient
             single(qualifier = named("entsoeApiKey")) { "TEST_KEY" }
