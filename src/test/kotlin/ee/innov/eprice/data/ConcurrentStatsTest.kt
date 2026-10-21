@@ -5,6 +5,7 @@ import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.test.InMemoryDailyStatsCache
+import ee.innov.eprice.test.dayPrices
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -26,6 +27,30 @@ import kotlin.test.assertTrue
 
 class ConcurrentStatsTest {
     private val first = LocalDate.of(2026, 8, 1)
+
+    @Test
+    fun `immediate retries do not reuse completed failed fills`() = runBlocking {
+        val cache = InMemoryDailyStatsCache()
+        val failure = IllegalStateException("Provider unavailable")
+        var calls = 0
+        val prices = object : EnergyPriceRepository {
+            override suspend fun getPrices(countryCode: String, start: Instant, end: Instant, cacheResults: Boolean): Result<List<DomainEnergyPrice>> {
+                if (++calls % 2 == 1) return Result.failure(failure)
+                return Result.success(dayPrices(first, BiddingZones.resolve(countryCode).zoneId))
+            }
+        }
+        PriceStatsRepositoryImpl(prices, cache, errorCooldown = Duration.ZERO).use { repository ->
+            // Exercise the interval between Deferred completion and in-flight cleanup.
+            repeat(10_000) { iteration ->
+                assertSame(failure, repository.getDailyStats("EE", first, first).exceptionOrNull())
+                val retry = repository.getDailyStats("EE", first, first)
+                assertTrue(retry.isSuccess, "Retry reused a completed failure at iteration $iteration")
+                assertEquals(setOf(first), retry.getOrThrow().keys)
+                cache.clear()
+            }
+            assertEquals(20_000, calls)
+        }
+    }
 
     @Test
     fun `cached and cooling subsets return without waiting for a failing larger fill`() = runBlocking {

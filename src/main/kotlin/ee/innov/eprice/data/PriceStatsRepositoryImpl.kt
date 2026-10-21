@@ -56,7 +56,9 @@ class PriceStatsRepositoryImpl(
             cachedStatsIfNotDue(countryCode, startDate, endDate)?.let { return Result.success(it) }
             // One fill per region. Other regions remain independent. Never suspend under this lock.
             val pending = synchronized(inFlight) {
-                inFlight[countryCode] ?: run {
+                // Completion is visible before its cleanup handler necessarily runs.
+                // Only share work still running; retries must recheck the error cooldown.
+                inFlight[countryCode]?.takeUnless { it.result.isCompleted } ?: run {
                     val result = fetchScope.async(start = CoroutineStart.LAZY) {
                         loadDailyStats(countryCode, startDate, endDate)
                     }
