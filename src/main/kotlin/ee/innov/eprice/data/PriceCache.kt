@@ -32,9 +32,13 @@ private data class CacheEntry(
 private typealias PriceCacheDto = Map<String, CacheEntry>
 
 class InMemoryPriceCache(
-    cacheFile: Path = Paths.get("eprice-cache-v2.json"),
+    cacheFile: Path = Paths.get(FILE_NAME),
     private val cacheDuration: Duration = Duration.ofMinutes(60)
 ) : BaseFileCache(cacheFile), PriceCache {
+
+    companion object {
+        const val FILE_NAME = "eprice-cache-v3-sdac.json"
+    }
 
     private val cache = ConcurrentHashMap<String, CacheEntry>()
 

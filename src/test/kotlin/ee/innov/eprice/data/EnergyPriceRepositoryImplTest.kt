@@ -8,6 +8,10 @@ import ee.innov.eprice.data.entsoe.EntsoeService
 import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.monitoring.ServiceMonitor
+import ee.innov.eprice.test.dayPrices
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -29,6 +33,31 @@ import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicInteger
 
 class EnergyPriceRepositoryImplTest {
+
+    @Test
+    fun `missing tomorrow does not prevent serving and caching available Elering prices`() = runBlocking {
+        val region = BiddingZones.resolve("EE")
+        val today = LocalDate.of(2026, 10, 20)
+        val start = today.minusDays(1).atStartOfDay(region.zoneId).toInstant()
+        val end = today.plusDays(2).atStartOfDay(region.zoneId).toInstant()
+        val available = dayPrices(today.minusDays(1), region.zoneId) + dayPrices(today, region.zoneId)
+        val elering = mockk<EleringService>()
+        val entsoe = mockk<EntsoeService>()
+        coEvery { elering.fetchPrices("EE", start, end) } returns available
+        coEvery { entsoe.fetchPrices(any(), any(), any()) } throws IllegalStateException("Provider unavailable")
+        val cache = mockk<PriceCache>()
+        var saved: List<DomainEnergyPrice>? = null
+        io.mockk.every { cache.get(any()) } answers { saved }
+        io.mockk.every { cache.put(any(), any(), any()) } answers { saved = secondArg() }
+        val repository = EnergyPriceRepositoryImpl(entsoe, elering, cache)
+
+        repeat(2) {
+            assertEquals(available, repository.getPrices("EE", start, end).getOrThrow())
+        }
+        coVerify(exactly = 1) { elering.fetchPrices("EE", start, end) }
+        coVerify(exactly = 0) { entsoe.fetchPrices(any(), any(), any()) }
+        io.mockk.verify(exactly = 1) { cache.put(any(), available, false) }
+    }
 
     private val tempFiles = mutableListOf<Path>()
 

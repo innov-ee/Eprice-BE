@@ -1,9 +1,9 @@
 # TODO
-- Requests for tomorrows prices/stats can miss cache before noon, and this means they fall thru to actual requests every time - undesired, improve!
-- Stats requests in ranges where data is missing always trigger outgoing requests - undesired, improve!
+- Requests for tomorrows prices can miss cache before noon, and this means they fall thru to actual requests every time - undesired, improve!
 - For each region also list currency
 
 # Nice to have
+- Consider limiting ENTSO-E fallback to days due for refresh. Currently a full-window Elering refresh can trigger one extra request per consecutive group of missing days, even if those days are already cached or in cooldown. And a failed unnecessary request can fail the summary.
 - Consider removing Result wrappers
 - Clean up routing a lot (that class should have minimal to no changes when any route is changed/added/removed)
 - Figure out the best way to handle time. (tiemstamp, bespoke class, zones, etc)

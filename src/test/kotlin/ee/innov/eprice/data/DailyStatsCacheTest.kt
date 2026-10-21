@@ -10,6 +10,10 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
+import java.time.Instant
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.delay
 
 class DailyStatsCacheTest {
 
@@ -18,6 +22,31 @@ class DailyStatsCacheTest {
     @AfterEach
     fun tearDown() {
         Files.deleteIfExists(tempFile)
+    }
+
+    @Test
+    fun `missing metadata survives restart and complete stats and clear remove it`() = runBlocking {
+        // Existing v2 cache files without missing metadata still load.
+        Files.writeString(tempFile, """{"data":{}}""")
+        val cache = FileBackedDailyStatsCache(tempFile)
+        val date = LocalDate.of(2026, 10, 21)
+        val now = Instant.parse("2026-10-20T08:00:00Z")
+        val partial = DailyStatEntry(0.1, 0.1, 0.1, 2.3, 23, isComplete = false)
+        val missing = MissingDailyStats(MissingStatsReason.PARTIAL, now, now.plusSeconds(900), 2, partialStats = partial)
+        cache.putMissingBatch("IE", mapOf(date to missing))
+        withTimeout(5000) {
+            while (!Files.readString(tempFile).contains("PARTIAL")) delay(10)
+        }
+        val restored = FileBackedDailyStatsCache(tempFile)
+        assertEquals(missing, restored.getMissing("IE", date))
+        assertEquals(partial, restored.getMissing("IE", date)!!.partialStats)
+        assertNull(restored.get("IE", date))
+        restored.putBatch("IE", mapOf(date to DailyStatEntry(0.1, 0.1, 0.1, 2.4, 24)))
+        assertNull(restored.getMissing("IE", date))
+        restored.putMissingBatch("GB", mapOf(date to missing))
+        restored.clear()
+        assertNull(restored.getMissing("GB", date))
+        assertNull(restored.get("IE", date))
     }
 
     @Test

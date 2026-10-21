@@ -7,6 +7,7 @@ import ee.innov.eprice.domain.GetPriceSummaryUseCase
 import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.model.ApiError
 import ee.innov.eprice.domain.model.NoDataFoundException
+import ee.innov.eprice.monitoring.CacheOverview
 import ee.innov.eprice.monitoring.ServiceMonitor
 import ee.innov.eprice.monitoring.ServiceLogs
 import ee.innov.eprice.security.AUTH_ADMIN_BASIC
@@ -75,6 +76,11 @@ fun Route.priceRoutes() {
             call.respond(HttpStatusCode.OK, monitor.getStats())
         }
 
+        get("/monitor/caches") {
+            call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+            call.respond(HttpStatusCode.OK, CacheOverview.read(dailyStatsCache, monitor))
+        }
+
         get("/monitor/logs") {
             call.response.headers.append(HttpHeaders.CacheControl, "no-store")
             call.respond(HttpStatusCode.OK, serviceLogs.snapshot())
@@ -126,6 +132,7 @@ fun Route.priceRoutes() {
         get("/api/prices/{countryCode}/stats/summary") {
             val countryCode = call.resolveRegionCode() ?: return@get
 
+            monitor.recordStatsRequest(countryCode)
             val result = getPriceSummaryUseCase.execute(countryCode)
 
             result.onSuccess { summary ->
