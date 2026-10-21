@@ -12,7 +12,8 @@ data class DailyStatEntry(
     val avg: Double,
     val sum: Double,
     val count: Int,
-    val durationSeconds: Long = count * 3600L
+    val durationSeconds: Long = count * 3600L,
+    val isComplete: Boolean = true
 ) {
     /**
      * Checks whether the entry covers the actual local day, including DST transitions.
@@ -20,6 +21,6 @@ data class DailyStatEntry(
     fun isFullDay(date: LocalDate, zoneId: ZoneId): Boolean {
         val start = date.atStartOfDay(zoneId)
         val end = date.plusDays(1).atStartOfDay(zoneId)
-        return durationSeconds == Duration.between(start, end).seconds
+        return isComplete && durationSeconds == Duration.between(start, end).seconds
     }
 }

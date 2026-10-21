@@ -53,7 +53,9 @@ class PriceStatsRepositoryImpl(
     ): Result<Map<LocalDate, DailyStatEntry>> {
         while (true) {
             // Cache-only requests must not wait for, or inherit failures from, another range's fill.
-            cachedStatsIfNotDue(countryCode, startDate, endDate)?.let { return Result.success(it) }
+            cachedStatsIfNotDue(countryCode, startDate, endDate)?.let {
+                return Result.success(withPartialStats(countryCode, startDate, endDate, it))
+            }
             // One fill per region. Other regions remain independent. Never suspend under this lock.
             val pending = synchronized(inFlight) {
                 // Completion is visible before its cleanup handler necessarily runs.
@@ -76,7 +78,9 @@ class PriceStatsRepositoryImpl(
             // Cancelling an HTTP caller cancels only its wait, not the shared fill.
             val result = pending.result.await()
             if (startDate >= pending.start && endDate <= pending.end) {
-                return result.map { stats -> stats.filterKeys { it >= startDate && it <= endDate } }
+                return result.map { stats ->
+                    withPartialStats(countryCode, startDate, endDate, stats.filterKeys { it >= startDate && it <= endDate })
+                }
             }
             // An overlapping range finished: recheck complete days and cooldowns before extending it.
         }
@@ -84,6 +88,20 @@ class PriceStatsRepositoryImpl(
 
     override fun close() {
         fetchScope.cancel()
+    }
+
+    private fun withPartialStats(
+        countryCode: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        completeStats: Map<LocalDate, DailyStatEntry>
+    ): Map<LocalDate, DailyStatEntry> {
+        val today = LocalDate.now(clock.withZone(BiddingZones.resolve(countryCode).zoneId))
+        val partialStats = listOf(today, today.plusDays(1)).mapNotNull { date ->
+            if (date < startDate || date > endDate || date in completeStats) return@mapNotNull null
+            dailyStatsCache.getMissing(countryCode, date)?.partialStats?.let { date to it }
+        }.toMap()
+        return completeStats + partialStats
     }
 
     private fun cachedStatsIfNotDue(
@@ -135,6 +153,8 @@ class PriceStatsRepositoryImpl(
             val end = endDate.plusDays(1).atStartOfDay(zoneId).toInstant()
             val prices = energyPriceRepository.getPrices(countryCode, start, end, cacheResults = false).getOrThrow()
 
+            val now = clock.instant()
+            val today = now.atZone(zoneId).toLocalDate()
             val missing = mutableMapOf<LocalDate, MissingDailyStats>()
             val fetchedStats = missingDates.mapNotNull { date ->
                 val dayStart = date.atStartOfDay(zoneId).toInstant()
@@ -143,10 +163,17 @@ class PriceStatsRepositoryImpl(
                 if (dayPrices.isFullDay(date, zoneId)) {
                     date to dailyStat(dayPrices)
                 } else {
+                    val previous = dailyStatsCache.getMissing(countryCode, date)
+                    // Today and tomorrow may be provisional, but overlapping intervals are invalid data.
+                    val partial = if (date in today..today.plusDays(1) && dayPrices.isNotEmpty() && dayPrices.zipWithNext().all { (a, b) ->
+                        a.startTime.plusSeconds(a.durationSeconds) <= b.startTime
+                    }) dailyStat(dayPrices, isComplete = false) else null
                     // Incidental checks can recover a gap, but must not extend its active cooldown.
                     if (date in dueDates) {
                         val reason = if (dayPrices.isEmpty()) MissingStatsReason.NO_DATA else MissingStatsReason.PARTIAL
-                        missing[date] = refreshPolicy.missing(date, zoneId, clock.instant(), dailyStatsCache.getMissing(countryCode, date), reason)
+                        missing[date] = refreshPolicy.missing(date, zoneId, now, previous, reason).copy(partialStats = partial)
+                    } else if (previous != null && previous.partialStats != partial) {
+                        missing[date] = previous.copy(partialStats = partial)
                     }
                     null
                 }
@@ -162,7 +189,7 @@ class PriceStatsRepositoryImpl(
         }
     }
 
-    private fun dailyStat(prices: List<DomainEnergyPrice>): DailyStatEntry {
+    private fun dailyStat(prices: List<DomainEnergyPrice>, isComplete: Boolean = true): DailyStatEntry {
         val pricesList = prices.map { it.pricePerKWh }
         return DailyStatEntry(
             min = pricesList.min(),
@@ -170,7 +197,8 @@ class PriceStatsRepositoryImpl(
             avg = prices.sumOf { it.pricePerKWh * it.durationSeconds } / prices.sumOf { it.durationSeconds },
             sum = pricesList.sum(),
             count = pricesList.size,
-            durationSeconds = prices.sumOf { it.durationSeconds }
+            durationSeconds = prices.sumOf { it.durationSeconds },
+            isComplete = isComplete
         )
     }
 }

@@ -1,5 +1,6 @@
 package ee.innov.eprice.data
 
+import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.util.InstantSerializer
 import kotlinx.serialization.Serializable
 import java.time.Duration
@@ -16,7 +17,9 @@ data class MissingDailyStats(
     val reason: MissingStatsReason,
     @Serializable(with = InstantSerializer::class) val checkedAt: Instant,
     @Serializable(with = InstantSerializer::class) val nextCheckAt: Instant,
-    val consecutiveMisses: Int
+    val consecutiveMisses: Int,
+    // Provisional statistics are served only for region-local today and tomorrow.
+    val partialStats: DailyStatEntry? = null
 )
 
 /** Refresh choices, not guarantees about upstream publication times. All dates are region-local. */

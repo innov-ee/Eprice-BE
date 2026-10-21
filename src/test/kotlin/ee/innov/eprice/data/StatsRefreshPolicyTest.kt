@@ -86,11 +86,18 @@ class StatsRefreshPolicyTest {
                 }
             }
             fun repository(at: Instant) = PriceStatsRepositoryImpl(prices, cache, clock = Clock.fixed(at, ZoneOffset.UTC))
-            assertTrue(repository(now).getDailyStats("IE", tomorrow, tomorrow).getOrThrow().isEmpty())
+            val initial = repository(now).getDailyStats("IE", tomorrow, tomorrow).getOrThrow()
+            assertEquals(!partial, initial.isEmpty())
+            if (partial) {
+                assertEquals(false, initial.getValue(tomorrow).isComplete)
+                assertEquals(1800L, initial.getValue(tomorrow).durationSeconds)
+            }
             val missing = cache.getMissing("IE", tomorrow)!!
             assertEquals(if (partial) MissingStatsReason.PARTIAL else MissingStatsReason.NO_DATA, missing.reason)
             assertEquals(now, missing.checkedAt)
-            repeat(10) { assertTrue(repository(missing.nextCheckAt.minusSeconds(1)).getDailyStats("IE", tomorrow, tomorrow).getOrThrow().isEmpty()) }
+            repeat(10) {
+                assertEquals(initial, repository(missing.nextCheckAt.minusSeconds(1)).getDailyStats("IE", tomorrow, tomorrow).getOrThrow())
+            }
             assertEquals(1, calls)
             published = true
             assertEquals(setOf(tomorrow), repository(missing.nextCheckAt).getDailyStats("IE", tomorrow, tomorrow).getOrThrow().keys)
