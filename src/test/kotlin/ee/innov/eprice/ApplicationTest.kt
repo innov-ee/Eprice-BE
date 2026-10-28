@@ -26,6 +26,10 @@ import io.ktor.http.headersOf
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.koin.core.context.GlobalContext
@@ -212,12 +216,13 @@ class ApplicationTest {
     @Test
     fun `GET prices stats summary should return 200 OK with combined summary`() {
         runPriceApiTest(
-            engineHandler = createMockEngineHandler(
-                eleringContent = mockEleringSuccessJson,
-                eleringStatus = HttpStatusCode.OK,
-                entsoeContent = "<Error>Entsoe should not be called</Error>",
-                entsoeStatus = HttpStatusCode.InternalServerError
-            ),
+            engineHandler = { request ->
+                assertEquals("dashboard.elering.ee", request.url.host)
+                val start = java.time.Instant.parse(request.url.parameters["start"])
+                val end = java.time.Instant.parse(request.url.parameters["end"])
+                val hours = java.time.Duration.between(start, end).toHours().toInt()
+                mockJsonResponse(generateEleringDailyJson(start, hours), HttpStatusCode.OK)
+            },
             testBlock = { client ->
                 val response = client.get("/api/prices/EE/stats/summary")
 
@@ -227,6 +232,38 @@ class ApplicationTest {
                 assertTrue(body.contains(""""rolling":{"""))
                 assertTrue(body.contains(""""yesterday":{"""))
                 assertTrue(body.contains(""""today":{"""))
+            }
+        )
+    }
+
+    @Test
+    fun `cache overview is admin only and counts only valid authenticated stats calls`() {
+        runPriceApiTest(
+            engineHandler = { error("Cache inspection must never fetch upstream data") },
+            testBlock = { admin ->
+                val path = "/monitor/caches"
+                assertEquals(HttpStatusCode.Unauthorized, client.get(path).status)
+                assertEquals(HttpStatusCode.Unauthorized, client.get(path) {
+                    header("X-API-Key", KeyRotationService().getKeyInfo().operationalKey)
+                }.status)
+                assertEquals(HttpStatusCode.Unauthorized, client.get(path) {
+                    header("X-Bootstrap-Key", "test-bootstrap-key")
+                }.status)
+                val first = admin.get(path)
+                assertEquals(HttpStatusCode.OK, first.status)
+                assertEquals("no-store", first.headers[HttpHeaders.CacheControl])
+                assertTrue(first.bodyAsText().contains("\"statsRequests\":0"))
+                admin.get("/api/prices/EE/stats/summary") // A failed request still counts.
+                admin.get("/api/prices/invalid/stats/summary")
+                client.get("/api/prices/FI/stats/summary") // Unauthenticated calls do not count.
+                admin.get("/api/prices/FI") // Price calls do not count.
+                val regions = Json.parseToJsonElement(admin.get(path).bodyAsText()).jsonObject
+                    .getValue("regions").jsonArray
+                fun count(region: String): String = regions.map { it.jsonObject }
+                    .first { it.getValue("region").jsonPrimitive.content == region }
+                    .getValue("statsRequests").jsonPrimitive.content
+                assertEquals("1", count("EE"))
+                assertEquals("0", count("FI"))
             }
         )
     }
@@ -579,13 +616,9 @@ class ApplicationTest {
                         try {
                             val startInstant = java.time.Instant.parse(startParam)
                             val endInstant = java.time.Instant.parse(endParam)
-                            val durationSeconds = java.time.Duration.between(startInstant, endInstant).seconds
-                            if (durationSeconds <= 86400) {
-                                val content = generateEleringDailyJson(startInstant)
-                                mockJsonResponse(content, eleringStatus)
-                            } else {
-                                mockJsonResponse(eleringContent, eleringStatus)
-                            }
+                            // A successful Elering-only fixture must cover every requested day.
+                            val hours = java.time.Duration.between(startInstant, endInstant).toHours().toInt()
+                            mockJsonResponse(generateEleringDailyJson(startInstant, hours), eleringStatus)
                         } catch (_: Exception) {
                             mockJsonResponse(eleringContent, eleringStatus)
                         }

@@ -25,7 +25,7 @@ class DailyPriceStatisticsRegressionTest {
     private val zone = ZoneId.of("Europe/Berlin")
 
     @Test
-    fun `statistics repository excludes partial days before the summary consumes them`() = runBlocking {
+    fun `statistics repository allows partial today and tomorrow but excludes partial yesterday`() = runBlocking {
         val clock = Clock.fixed(Instant.parse("2026-08-22T12:00:00Z"), ZoneOffset.UTC)
         listOf(-1L, 0L, 1L).forEach { partialDayOffset ->
             val partialDate = date.plusDays(partialDayOffset)
@@ -35,11 +35,15 @@ class DailyPriceStatisticsRegressionTest {
                 if (day == partialDate) intervals.take(8) else intervals
             }
             val cache = InMemoryDailyStatsCache()
-            val repository = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(prices)), cache)
+            val repository = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(prices)), cache, clock = clock)
             val result = GetPriceSummaryUseCase(repository, clock, rollingDays = 1).execute("DE_LU")
 
             if (partialDayOffset == 1L) {
-                assertEquals(null, result.getOrThrow().tomorrow)
+                assertEquals(false, result.getOrThrow().tomorrow!!.isComplete)
+                assertEquals(7200L, result.getOrThrow().tomorrow!!.coverageSeconds)
+            } else if (partialDayOffset == 0L) {
+                assertEquals(false, result.getOrThrow().today.isComplete)
+                assertEquals(7200L, result.getOrThrow().today.coverageSeconds)
             } else {
                 assertTrue(result.exceptionOrNull() is NoDataFoundException)
             }

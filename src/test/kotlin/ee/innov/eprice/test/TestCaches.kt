@@ -2,6 +2,7 @@ package ee.innov.eprice.test
 
 import ee.innov.eprice.data.DailyStatsCache
 import ee.innov.eprice.data.PriceCache
+import ee.innov.eprice.data.MissingDailyStats
 import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import java.time.LocalDate
@@ -23,10 +24,13 @@ class NoOpDailyStatsCache : DailyStatsCache {
         endDate: LocalDate
     ): Map<LocalDate, DailyStatEntry> = emptyMap()
 
+    override fun getMissing(countryCode: String, date: LocalDate): MissingDailyStats? = null
+    override fun putMissingBatch(countryCode: String, entries: Map<LocalDate, MissingDailyStats>) {}
     override fun clear() {}
 }
 
 class InMemoryDailyStatsCache : DailyStatsCache {
+    private val missing = ConcurrentHashMap<Pair<String, LocalDate>, MissingDailyStats>()
     val store = ConcurrentHashMap<String, ConcurrentHashMap<LocalDate, DailyStatEntry>>()
 
     override fun get(countryCode: String, date: LocalDate): DailyStatEntry? =
@@ -34,6 +38,7 @@ class InMemoryDailyStatsCache : DailyStatsCache {
 
     override fun put(countryCode: String, date: LocalDate, stats: DailyStatEntry) {
         store.getOrPut(countryCode) { ConcurrentHashMap() }[date] = stats
+        missing.remove(countryCode to date)
     }
 
     override fun putBatch(countryCode: String, entries: Map<LocalDate, DailyStatEntry>) {
@@ -49,7 +54,14 @@ class InMemoryDailyStatsCache : DailyStatsCache {
         return countryMap.filterKeys { !it.isBefore(startDate) && !it.isAfter(endDate) }
     }
 
+    override fun getMissing(countryCode: String, date: LocalDate): MissingDailyStats? = missing[countryCode to date]
+
+    override fun putMissingBatch(countryCode: String, entries: Map<LocalDate, MissingDailyStats>) {
+        entries.forEach { (date, entry) -> missing[countryCode to date] = entry }
+    }
+
     override fun clear() {
+        missing.clear()
         store.clear()
     }
 }

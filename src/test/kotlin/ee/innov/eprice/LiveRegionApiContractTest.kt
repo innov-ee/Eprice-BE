@@ -102,7 +102,7 @@ class LiveRegionApiContractTest {
     }
 
     private fun assertStatistics(fields: JsonObject, code: String, price: Double) {
-        assertEquals(setOf("countryCode", "startDate", "endDate", "daysRequested", "daysCalculated", "minPrice", "maxPrice", "averagePrice"), fields.keys)
+        assertEquals(setOf("countryCode", "startDate", "endDate", "daysRequested", "daysCalculated", "minPrice", "maxPrice", "averagePrice", "isComplete", "coverageSeconds"), fields.keys)
         listOf("countryCode", "startDate", "endDate").forEach { assertTrue(fields.getValue(it).jsonPrimitive.isString) }
         assertEquals(code, fields.getValue("countryCode").jsonPrimitive.content)
         listOf("minPrice", "maxPrice", "averagePrice").forEach {
@@ -111,6 +111,9 @@ class LiveRegionApiContractTest {
         }
         assertFalse(fields.getValue("daysRequested").jsonPrimitive.isString)
         assertFalse(fields.getValue("daysCalculated").jsonPrimitive.isString)
+        assertEquals("true", fields.getValue("isComplete").jsonPrimitive.content)
+        assertFalse(fields.getValue("isComplete").jsonPrimitive.isString)
+        assertFalse(fields.getValue("coverageSeconds").jsonPrimitive.isString)
     }
 
     @Test

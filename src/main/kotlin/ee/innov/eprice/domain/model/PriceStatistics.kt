@@ -12,7 +12,9 @@ data class PriceStatistics(
     val daysCalculated: Int,
     val minPrice: Double,
     val maxPrice: Double,
-    val averagePrice: Double
+    val averagePrice: Double,
+    val isComplete: Boolean,
+    val coverageSeconds: Long
 ) {
     companion object {
         /**
@@ -41,7 +43,9 @@ data class PriceStatistics(
                 daysCalculated = dailyStats.size,
                 minPrice = minPrice,
                 maxPrice = maxPrice,
-                averagePrice = averagePrice
+                averagePrice = averagePrice,
+                isComplete = dailyStats.size == daysRequested && dailyStats.all { it.isComplete },
+                coverageSeconds = seconds
             )
         }
 

@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.ConcurrentHashMap
+import ee.innov.eprice.domain.BiddingZones
 
 @Serializable
 data class ServiceStats(
@@ -36,6 +38,15 @@ class ServiceMonitor(val identity: ServiceIdentity = ServiceIdentity.load()) {
     private val failedOutgoingEntsoeCounter = AtomicLong(0)
     private val cacheHitCounter = AtomicLong(0)
     private val cacheMissCounter = AtomicLong(0)
+
+    private val statsRequests = ConcurrentHashMap<String, AtomicLong>()
+
+    fun recordStatsRequest(region: String) {
+        BiddingZones.resolve(region)
+        statsRequests.computeIfAbsent(region) { AtomicLong() }.incrementAndGet()
+    }
+
+    fun statsRequestCount(region: String): Long = statsRequests[region]?.get() ?: 0L
 
     fun incrementIncoming() {
         incomingCounter.incrementAndGet()

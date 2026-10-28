@@ -675,6 +675,16 @@
             color: var(--text-muted);
             font-size: 0.85rem;
         }
+        .cache-grid-wrap { overflow-x: auto; margin-top: 12px; }
+        .cache-grid { border-collapse: separate; border-spacing: 2px; table-layout: fixed; width: 100%; min-width: 700px; font-family: var(--font-mono); font-size: 12px; }
+        .cache-grid th, .cache-grid td { padding: 5px; text-align: center; white-space: nowrap; }
+        .cache-grid thead th { position: sticky; top: 0; background: var(--bg-secondary); z-index: 1; }
+        .cache-grid thead th:nth-child(n+3) { padding: 5px 0; }
+        .cache-grid th:nth-child(2) { width: 44px; }
+        .cache-grid th:first-child { width: 64px; text-align: left; position: sticky; left: 0; background: var(--bg-secondary); }
+        .cache-grid td.cache-cell { border: 1px solid var(--card-border); border-radius: 3px; height: 22px; padding: 0; }
+        .cache-cell.full { background: #166534; color: #dcfce7; }
+        .cache-cell.partial { background: #854d0e; color: #fef9c3; }
     </style>
 </head>
 <body>
@@ -836,6 +846,19 @@
                 </div>
             </div>
         </div>
+        <section class="monitor-card" aria-label="Daily stats cache" style="margin-top: 24px;">
+            <div class="monitor-card-header">
+                <div>
+                    <h2 class="monitor-card-title">Daily Stats Cache</h2>
+                    <p class="stat-subtext">32 days per region · Tomorrow, today, then days ago · dates use each region’s timezone</p>
+                </div>
+                <button class="btn btn-sm" id="displayCachesBtn" onclick="refreshCaches()">Display caches</button>
+            </div>
+            <p class="stat-subtext">Green: complete · Yellow: partial response recorded · Transparent: missing / no data. Per-day errors are not stored in this cache; see service logs.</p>
+            <p class="stat-subtext">Stats requests count authenticated summary calls, including failures, since this server started. Price calls are excluded. Partial cells indicate the last recorded response; partial price data is not retained by the stats cache.</p>
+            <p id="cacheStatus" class="last-updated-text" role="status"></p>
+            <div id="cacheGrid" class="cache-grid-wrap"></div>
+        </section>
     </div>
 
     <script>
@@ -845,6 +868,69 @@
         let currentMethod = "GET";
         let lastDefaultHeadersString = "";
         let currentOperationalKey = "";
+
+        let cachesLoading = false;
+        let cachesDisplayed = false;
+        async function refreshCaches() {
+            if (cachesLoading) return;
+            cachesLoading = true;
+            const button = document.getElementById("displayCachesBtn");
+            const status = document.getElementById("cacheStatus");
+            button.disabled = true;
+            status.textContent = "Reading cache…";
+            try {
+                const response = await fetch("/monitor/caches", { cache: "no-store" });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const overview = await response.json();
+                const table = document.createElement("table");
+                table.className = "cache-grid";
+                const caption = table.createCaption();
+                caption.textContent = "Daily statistics cache coverage and stats requests since startup";
+                caption.className = "stat-subtext";
+                const header = table.createTHead().insertRow();
+                for (const [index, label] of ["Region", "r", ...(overview.regions[0]?.days || []).map(day => String(Math.abs(day.offset)))].entries()) {
+                    const th = document.createElement("th");
+                    th.scope = "col";
+                    th.textContent = label;
+                    const description = index === 1 ? "Stats requests since startup" : index >= 2
+                        ? (index === 2 ? "Tomorrow" : index === 3 ? "Today" : `${label} days ago`) : "Region";
+                    th.title = description;
+                    th.setAttribute("aria-label", description);
+                    header.appendChild(th);
+                }
+                const body = table.createTBody();
+                for (const region of overview.regions) {
+                    const row = body.insertRow();
+                    const name = document.createElement("th");
+                    name.scope = "row";
+                    name.textContent = region.region;
+                    name.title = region.timezone;
+                    row.appendChild(name);
+                    const requests = row.insertCell();
+                    const requestCount = document.createElement("span");
+                    requestCount.textContent = Number(region.statsRequests).toLocaleString();
+                    if (Number(region.statsRequests) === 0) requestCount.style.opacity = "0.3";
+                    requests.appendChild(requestCount);
+                    for (const day of region.days) {
+                        const cell = row.insertCell();
+                        const state = ["full", "partial"].includes(day.state) ? day.state : "missing";
+                        cell.className = `cache-cell ${state}`;
+                        cell.title = `${region.region} ${day.date}: ${day.detail}`;
+                        cell.setAttribute("aria-label", cell.title);
+                        cell.tabIndex = 0;
+                    }
+                }
+                document.getElementById("cacheGrid").replaceChildren(table);
+                cachesDisplayed = true;
+                button.textContent = "Refresh caches";
+                status.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                status.textContent = `Cache overview unavailable (${error.message})${cachesDisplayed ? " · displayed data may be stale" : ""}`;
+            } finally {
+                button.disabled = false;
+                cachesLoading = false;
+            }
+        }
 
         // 1. Fetch & Render Catalog
         async function loadCatalog() {
@@ -978,6 +1064,7 @@
 
         async function refreshMonitor() {
             refreshServiceLogs();
+            if (cachesDisplayed) refreshCaches();
             const refreshBtn = document.getElementById("refreshMonitorBtn");
             if (refreshBtn) {
                 refreshBtn.innerHTML = `<span class="spinner"></span> Refresh`;
