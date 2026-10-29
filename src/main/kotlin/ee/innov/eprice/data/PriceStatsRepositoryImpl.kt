@@ -22,6 +22,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.hours
 
 class PriceStatsRepositoryImpl(
     private val energyPriceRepository: EnergyPriceRepository,
@@ -31,6 +32,10 @@ class PriceStatsRepositoryImpl(
     private val refreshPolicy: StatsRefreshPolicy = StatsRefreshPolicy(),
     private val errorCooldown: Duration = Duration.ofSeconds(30)
 ) : PriceStatsRepository, AutoCloseable {
+
+    private companion object {
+        val MIN_PARTIAL_COVERAGE_SECONDS = 20.hours.inWholeSeconds
+    }
 
     init {
         require(!errorCooldown.isNegative) { "Error cooldown must not be negative" }
@@ -99,7 +104,9 @@ class PriceStatsRepositoryImpl(
         val today = LocalDate.now(clock.withZone(BiddingZones.resolve(countryCode).zoneId))
         val partialStats = listOf(today, today.plusDays(1)).mapNotNull { date ->
             if (date < startDate || date > endDate || date in completeStats) return@mapNotNull null
-            dailyStatsCache.getMissing(countryCode, date)?.partialStats?.let { date to it }
+            dailyStatsCache.getMissing(countryCode, date)?.partialStats
+                ?.takeIf { it.durationSeconds >= MIN_PARTIAL_COVERAGE_SECONDS }
+                ?.let { date to it }
         }.toMap()
         return completeStats + partialStats
     }
@@ -164,8 +171,11 @@ class PriceStatsRepositoryImpl(
                     date to dailyStat(dayPrices)
                 } else {
                     val previous = dailyStatsCache.getMissing(countryCode, date)
-                    // Today and tomorrow may be provisional, but overlapping intervals are invalid data.
-                    val partial = if (date in today..today.plusDays(1) && dayPrices.isNotEmpty() && dayPrices.zipWithNext().all { (a, b) ->
+                    // Provisional days must meet the minimum coverage threshold, regardless of interval resolution.
+                    // Overlapping intervals cannot count towards that coverage.
+                    val partial = if (date in today..today.plusDays(1) &&
+                        dayPrices.sumOf { it.durationSeconds } >= MIN_PARTIAL_COVERAGE_SECONDS &&
+                        dayPrices.zipWithNext().all { (a, b) ->
                         a.startTime.plusSeconds(a.durationSeconds) <= b.startTime
                     }) dailyStat(dayPrices, isComplete = false) else null
                     // Incidental checks can recover a gap, but must not extend its active cooldown.

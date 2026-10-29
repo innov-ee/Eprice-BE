@@ -3,6 +3,7 @@ package ee.innov.eprice.data
 import ee.innov.eprice.domain.BiddingZones
 import ee.innov.eprice.domain.EnergyPriceRepository
 import ee.innov.eprice.domain.GetPriceSummaryUseCase
+import ee.innov.eprice.domain.model.DailyStatEntry
 import ee.innov.eprice.domain.model.DomainEnergyPrice
 import ee.innov.eprice.domain.model.NoDataFoundException
 import ee.innov.eprice.test.InMemoryDailyStatsCache
@@ -37,6 +38,84 @@ class PartialDailyStatsTest {
         ): Result<List<DomainEnergyPrice>> {
             calls++
             return Result.success(prices)
+        }
+    }
+
+    @Test
+    fun `partial days require twenty hours for hourly and quarter hourly prices`() = runBlocking {
+        val today = LocalDate.of(2026, 10, 21)
+        for (country in listOf("EE", "PT", "IE")) {
+            val zone = BiddingZones.resolve(country).zoneId
+            for (offset in 0L..1L) {
+                val date = today.plusDays(offset)
+                for (step in listOf(3600L, 900L)) {
+                    for (seconds in listOf(3600L, 72000L - step, 72000L, 82800L)) {
+                        val clock = Clock.fixed(today.atTime(9, 0).atZone(zone).toInstant(), ZoneOffset.UTC)
+                        val prices = dayPrices(date, zone, stepSeconds = step).take((seconds / step).toInt())
+                        val source = PriceSource(prices)
+                        val cache = InMemoryDailyStatsCache()
+                        PriceStatsRepositoryImpl(source, cache, clock = clock).use { repository ->
+                            val stats = repository.getDailyStats(country, date, date).getOrThrow()[date]
+                            if (seconds < 72000L) {
+                                assertNull(stats)
+                                assertNull(cache.getMissing(country, date)!!.partialStats)
+                            } else {
+                                assertEquals(seconds, stats!!.durationSeconds)
+                                assertFalse(stats.isComplete)
+                            }
+                            assertEquals(stats, repository.getDailyStats(country, date, date).getOrThrow()[date])
+                            assertEquals(1, source.calls)
+                            assertNull(cache.get(country, date))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Estonian summary omits sparse tomorrow until twenty hours are published`() = runBlocking {
+        val today = LocalDate.of(2026, 10, 21)
+        val zone = BiddingZones.resolve("EE").zoneId
+        val clock = MutableClock(today.atTime(14, 0).atZone(zone).toInstant())
+        val tomorrow = today.plusDays(1)
+        val published = dayPrices(today.minusDays(1), zone) + dayPrices(today, zone)
+        val nextDay = dayPrices(tomorrow, zone)
+        val source = PriceSource(published + nextDay.take(4))
+        PriceStatsRepositoryImpl(source, InMemoryDailyStatsCache(), clock = clock).use { repository ->
+            val useCase = GetPriceSummaryUseCase(repository, clock, rollingDays = 1)
+            val initial = useCase.execute("EE").getOrThrow()
+            assertNull(initial.tomorrow)
+            assertTrue(initial.today.isComplete)
+            assertTrue(initial.yesterday.isComplete)
+            assertTrue(initial.rolling.isComplete)
+            val json = Json.parseToJsonElement(Json { encodeDefaults = true }.encodeToString(initial)).jsonObject
+            assertEquals("null", json.getValue("tomorrow").toString())
+
+            source.prices = published + nextDay.take(80)
+            clock.now = clock.now.plusSeconds(900)
+            val updated = useCase.execute("EE").getOrThrow().tomorrow!!
+            assertEquals(72000L, updated.coverageSeconds)
+            assertFalse(updated.isComplete)
+        }
+    }
+
+    @Test
+    fun `cached provisional statistics below twenty hours are unavailable during cooldown`() = runBlocking {
+        val date = LocalDate.of(2026, 10, 21)
+        val now = Instant.parse("2026-10-21T06:00:00Z")
+        for (seconds in listOf(3600L, 71999L, 72000L)) {
+            val cache = InMemoryDailyStatsCache()
+            val cached = DailyStatEntry(0.1, 0.1, 0.1, 0.1, 1, seconds, isComplete = false)
+            cache.putMissingBatch("EE", mapOf(date to MissingDailyStats(
+                MissingStatsReason.PARTIAL, now, now.plusSeconds(900), 1, cached
+            )))
+            val source = PriceSource(emptyList())
+            PriceStatsRepositoryImpl(source, cache, clock = Clock.fixed(now, ZoneOffset.UTC)).use { repository ->
+                assertEquals(if (seconds >= 72000L) cached else null,
+                    repository.getDailyStats("EE", date, date).getOrThrow()[date])
+                assertEquals(0, source.calls)
+            }
         }
     }
 
@@ -199,7 +278,7 @@ class PartialDailyStatsTest {
     fun `empty and overlapping prices cannot become provisional statistics`() = runBlocking {
         val date = LocalDate.of(2026, 10, 21)
         val zone = BiddingZones.resolve("IE").zoneId
-        val intervals = dayPrices(date, zone).take(8)
+        val intervals = dayPrices(date, zone).take(80)
         for (prices in listOf(emptyList(), intervals + intervals.first())) {
             val clock = Clock.fixed(Instant.parse("2026-10-21T06:00:00Z"), ZoneOffset.UTC)
             val cache = InMemoryDailyStatsCache()
