@@ -171,7 +171,7 @@ class PriceStatsRepositoryImpl(
                     date to dailyStat(dayPrices)
                 } else {
                     val previous = dailyStatsCache.getMissing(countryCode, date)
-                    // Provisional days need at least 20 hours of coverage, regardless of interval resolution.
+                    // Provisional days must meet the minimum coverage threshold, regardless of interval resolution.
                     // Overlapping intervals cannot count towards that coverage.
                     val partial = if (date in today..today.plusDays(1) &&
                         dayPrices.sumOf { it.durationSeconds } >= MIN_PARTIAL_COVERAGE_SECONDS &&
