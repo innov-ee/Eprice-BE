@@ -22,6 +22,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.hours
 
 class PriceStatsRepositoryImpl(
     private val energyPriceRepository: EnergyPriceRepository,
@@ -33,7 +34,7 @@ class PriceStatsRepositoryImpl(
 ) : PriceStatsRepository, AutoCloseable {
 
     private companion object {
-        const val MIN_PARTIAL_COVERAGE_SECONDS = 20 * 3600L
+        val MIN_PARTIAL_COVERAGE_SECONDS = 20.hours.inWholeSeconds
     }
 
     init {
