@@ -32,7 +32,7 @@ class DailyPriceStatisticsRegressionTest {
             val prices = (-1L..1L).flatMap { offset ->
                 val day = date.plusDays(offset)
                 val intervals = dayPrices(day, zone)
-                if (day == partialDate) intervals.take(8) else intervals
+                if (day == partialDate) intervals.take(80) else intervals
             }
             val cache = InMemoryDailyStatsCache()
             val repository = PriceStatsRepositoryImpl(FixedPriceRepository(Result.success(prices)), cache, clock = clock)
@@ -40,10 +40,10 @@ class DailyPriceStatisticsRegressionTest {
 
             if (partialDayOffset == 1L) {
                 assertEquals(false, result.getOrThrow().tomorrow!!.isComplete)
-                assertEquals(7200L, result.getOrThrow().tomorrow!!.coverageSeconds)
+                assertEquals(72000L, result.getOrThrow().tomorrow!!.coverageSeconds)
             } else if (partialDayOffset == 0L) {
                 assertEquals(false, result.getOrThrow().today.isComplete)
-                assertEquals(7200L, result.getOrThrow().today.coverageSeconds)
+                assertEquals(72000L, result.getOrThrow().today.coverageSeconds)
             } else {
                 assertTrue(result.exceptionOrNull() is NoDataFoundException)
             }
